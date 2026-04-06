@@ -1,0 +1,8 @@
+name: chinese_war_game          # 环境的名称
+channels:                 # 下载包的优先级渠道
+  - conda-forge
+  - defaults
+dependencies:             # 需要安装的包列表
+  - python=3.11           
+  - pip                   
+  - numpy                 

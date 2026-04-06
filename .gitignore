@@ -1,0 +1,48 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+.venv/
+venv/
+env/
+
+# Conda
+.conda/
+
+# 测试与工具
+.pytest_cache/
+.coverage
+htmlcov/
+.mypy_cache/
+.ruff_cache/
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# 环境变量与密钥
+.env
+.env.*
+!.env.example
+
+# 参考文件
+ref
+
+# 训练产物（TensorBoard / SB3 等）
+ai/logs/
+ai/logs_multi/
+
+# 模型权重（按需：若希望提交演示用小模型可改为更窄规则）
+ai/models/*.zip
+*.pt
+*.pth
+*.ckpt
+*.onnx
