@@ -22,6 +22,7 @@ class TestGameRunner(unittest.TestCase):
         b.troops = 3
         m = _map_with_regions([None, a, b])
         s = GameState(m, num_players=2)
+        s.settle()
         self.assertEqual(len(s.active_players), 1)
         r = GameRunner(s, PlaceholderGameUi())
         self.assertIsNone(r.run())
@@ -41,7 +42,6 @@ class TestGameRunner(unittest.TestCase):
         cont = r.run_single_turn()
         self.assertTrue(cont)
         self.assertEqual(s.turn, 2)
-        self.assertEqual(r.last_turn_results, [])
 
     def test_run_single_turn_when_finished_returns_false(self) -> None:
         a = Region("a", [], 4)
@@ -49,6 +49,7 @@ class TestGameRunner(unittest.TestCase):
         a.troops = 5
         m = _map_with_regions([None, a])
         s = GameState(m, num_players=2)
+        s.settle()
         self.assertEqual(len(s.active_players), 1)
         r = GameRunner(s, PlaceholderGameUi())
         self.assertFalse(r.run_single_turn())

@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import math
 import random
 from typing import Any, Dict, List, Optional, Sequence
 
@@ -21,13 +20,45 @@ class Region:
     def is_adjacent_to(self, other_id: int) -> bool:
         return other_id in self.adjacent
 
+    def battle(self, strengths: Dict[int, int]) -> None:
+        """
+        按各方有效兵力结算本地区：就地更新 owner、troops。
+
+        strengths: 各势力到达本地区兵力。
+        规则：最大者胜；剩余兵力 = 全局最大 − 全局第二（严格小于最大者的最大兵力，无则为 0）。
+        并列最大时若守方在并列中则守方胜；否则多方进攻并列且守方不在并列中 → 中立、兵力 0。
+        """
+        defender = self.owner
+        d = dict(strengths)
+        d[defender] = d.get(defender, 0) + self.troops
+        pos = [v for v in d.values() if v > 0]
+        if not pos:
+            self.owner = 0
+            self.troops = 0
+            return
+        mx = max(pos)
+        winners = {k for k, v in d.items() if v == mx and v > 0}
+        second = max((v for v in d.values() if 0 < v < mx), default=0)
+        remain = mx - second
+        if len(winners) == 1:
+            w = next(iter(winners))
+            self.owner = w
+            self.troops = remain
+            return
+        if defender in winners:
+            self.owner = defender
+            self.troops = remain
+            return
+        self.owner = 0
+        self.troops = 0
+
 
 class GameMap:
     """版图：合法 id / 邻接校验、兵力增长、按指令更新地区。"""
 
     __slots__ = ("regions",)
 
-    def __init__(self, config_name: str = "default") -> None:
+    def __init__(self, config_name: str = "cn") -> None:
         self.regions = self._load_regions(parse_map_config(config_name))
 
     def assign_capitals(self, capitals: Sequence[int]) -> None:
@@ -99,31 +130,3 @@ class GameMap:
                 r.troops += r.base_growth
             elif r.owner == 0:
                 r.troops += 1
-
-    def move_troops(self, src: int, dst: int, troops: int, attacker: int) -> None:
-        regions = self.regions
-        assert regions[src] is not None and regions[dst] is not None
-        regions[src].troops -= troops
-        defender = regions[dst].owner
-
-        if defender == attacker:
-            regions[dst].troops += troops
-            return
-
-        atk = troops
-        dfd = regions[dst].troops
-        if self.is_surrounded(src):
-            atk = math.floor(atk * 0.5)
-        if self.is_surrounded(dst):
-            dfd = math.floor(dfd * 0.5)
-
-        if atk > dfd:
-            remain = troops - dfd
-            regions[dst].troops = remain
-            regions[dst].owner = attacker
-        elif atk < dfd:
-            remain = regions[dst].troops - atk
-            regions[dst].troops = remain
-        else:
-            regions[dst].troops = 0
-            regions[dst].owner = 0

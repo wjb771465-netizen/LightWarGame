@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Callable, List, Optional, TextIO
 
-from game.datatypes.command import Command, CommandResult
+from game.datatypes.command import Command
 from game.datatypes.state import GameState
 from . import display
 from . import input_handler
@@ -29,8 +29,8 @@ class TerminalGameUi:
     def show_state(self, state: GameState, player_id: int) -> None:
         display.show_full_state(state, player_id, self._out)
 
-    def show_turn_results(self, state: GameState, results: List[CommandResult]) -> None:
-        display.show_turn_results(state, results, self._out)
+    def show_turn_results(self, state: GameState) -> None:
+        display.show_turn_results(state, self._out)
 
     def show_game_result(self, state: GameState) -> None:
         display.show_game_result(state, self._out)

@@ -1,7 +1,6 @@
 import io
 import unittest
 
-from game.datatypes.command import Command
 from game.datatypes.game_map import GameMap, Region
 from game.datatypes.state import GameState
 from game.ui import display
@@ -31,6 +30,7 @@ class TestDisplay(unittest.TestCase):
         a.owner = 2
         m = _map_with_regions([None, a])
         s = GameState(m, num_players=2)
+        s.settle()
         display.show_game_result(s, out=buf)
         self.assertIn("2", buf.getvalue())
         self.assertIn("获胜", buf.getvalue())
@@ -51,7 +51,8 @@ class TestInputHandler(unittest.TestCase):
             s, 1, input_fn=lambda _: next(lines)
         )
         self.assertEqual(len(cmds), 1)
-        self.assertEqual(cmds[0], Command(1, 2, 3, 1))
+        c0 = cmds[0]
+        self.assertEqual((c0.source, c0.target, c0.troops, c0.player), (1, 2, 3, 1))
 
     def test_no_land_returns_empty(self) -> None:
         a = Region("a", [], 4)

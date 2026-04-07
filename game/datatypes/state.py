@@ -1,8 +1,10 @@
 from __future__ import annotations
 
-from typing import List, Optional
+import math
+from collections import defaultdict
+from typing import Dict, List, Optional
 
-from game.datatypes.command import Command, CommandResult
+from game.datatypes.command import Command
 from game.datatypes.game_map import GameMap
 from game.datatypes.game_obs import Observation, build_observation
 
@@ -24,7 +26,7 @@ class GameState:
     def settle(self) -> bool:
         """
         扫图更新 active_players。
-        若已终局（至多一名仍有地）返回 True 且不改 turn；
+        若已终局（至多一名仍有地）返回 True ；
         否则 turn += 1 并返回 False。
         """
         seen: set[int] = set()
@@ -39,6 +41,7 @@ class GameState:
         self.active_players = sorted(seen)
         if len(self.active_players) <= 1:
             return True
+        self.game_map.troop_growth()
         self.turn += 1
         return False
 
@@ -66,16 +69,37 @@ class GameState:
             return False
         return True
 
-    def resolve_turn(self, commands: List[Command]) -> List[CommandResult]:
-        """按顺序执行指令并执行版图兵力增长（不推进回合，回合由 settle 处理）。"""
-        results: List[CommandResult] = []
+    def check_cmds(self, commands: List[Command]) -> List[Command]:
+        """在不动地图的前提下筛出可执行指令（单条合法 + 同源派出总和 ≤ 该源兵力−1），顺序与入参一致。"""
+        m = self.game_map
+        valid_cmds = [cmd for cmd in commands if self.is_command_valid(cmd)]
+        sum_by_src: Dict[int, int] = defaultdict(int)
+        for cmd in valid_cmds:
+            sum_by_src[cmd.source] += cmd.troops
+
+        result: List[Command] = []
+        for cmd in valid_cmds:
+            src = m.get(cmd.source)
+            assert src is not None
+            if sum_by_src[cmd.source] <= src.troops - 1:
+                result.append(cmd)
+        return result
+
+    def apply_cmds(self, commands: List[Command]) -> None:
+        """
+        对已通过 check_cmds 的指令同时结算：每条指令聚到达（围困折半）并扣源 → Region.battle。
+        """
+        m = self.game_map
+        incoming: Dict[int, Dict[int, int]] = defaultdict(lambda: defaultdict(int))
         for cmd in commands:
-            if not self.is_command_valid(cmd):
-                res = CommandResult(cmd, False)
-                res.reason = "兵力不足或地区已变"
-                results.append(res)
+            t = cmd.troops
+            if m.is_surrounded(cmd.source):
+                t = math.floor(t * 0.5)
+            incoming[cmd.target][cmd.player] += t
+            m.regions[cmd.source].troops -= cmd.troops
+
+        for dst, by_player in incoming.items():
+            total_in = sum(by_player.values())
+            if total_in <= 0:
                 continue
-            self.game_map.move_troops(cmd.source, cmd.target, cmd.troops, cmd.player)
-            results.append(CommandResult(cmd, True))
-        self.game_map.troop_growth()
-        return results
+            m.regions[dst].battle({p: c for p, c in by_player.items() if c > 0})

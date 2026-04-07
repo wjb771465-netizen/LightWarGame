@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import List, Protocol, runtime_checkable
 
-from game.datatypes.command import Command, CommandResult
+from game.datatypes.command import Command
 from game.datatypes.state import GameState
 
 
@@ -25,7 +25,7 @@ class GameUiPort(Protocol):
         """版图信息（当前可全量，后续可改为迷雾）。"""
         ...
 
-    def show_turn_results(self, state: GameState, results: List[CommandResult]) -> None:
+    def show_turn_results(self, state: GameState) -> None:
         """本回合结算战报（可先空实现）。"""
         ...
 
@@ -50,7 +50,7 @@ class PlaceholderGameUi:
     def show_state(self, state: GameState, player_id: int) -> None:
         pass
 
-    def show_turn_results(self, state: GameState, results: List[CommandResult]) -> None:
+    def show_turn_results(self, state: GameState) -> None:
         pass
 
     def show_game_result(self, state: GameState) -> None:

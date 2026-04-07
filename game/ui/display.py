@@ -3,9 +3,8 @@
 from __future__ import annotations
 
 import sys
-from typing import List, Optional, TextIO
+from typing import Optional, TextIO
 
-from game.datatypes.command import CommandResult
 from game.datatypes.state import GameState
 
 
@@ -43,11 +42,8 @@ def show_full_state(state: GameState, viewer_id: int, out: Optional[TextIO] = No
     print(file=o)
 
 
-def show_turn_results(
-    state: GameState, results: List[CommandResult], out: Optional[TextIO] = None
-) -> None:
+def show_turn_results(state: GameState, out: Optional[TextIO] = None) -> None:
     _ = state
-    _ = results
     o = out or sys.stdout
     print("（本回合战报待实现）\n", file=o)
 
