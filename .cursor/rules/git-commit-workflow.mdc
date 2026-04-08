@@ -1,0 +1,40 @@
+---
+description: 两段式 Git 提交工作流（分析+测试+方案 → 用户确认后再 commit/push）
+alwaysApply: false
+---
+# Git 两段式提交工作流
+
+## 何时启用
+
+当用户**明确要求提交代码**时使用本流程，例如：「提交」「commit」「准备提交」「帮我生成提交」「走提交工作流」等。
+
+**未出现上述意图时**，不要主动跑本流程、不要擅自 `git commit` / `git push`。
+
+## 第一阶段（自动；禁止在此阶段 commit / push）
+
+1. **仓库状态**：运行 `git status`、`git diff --stat`；若改动难读，再对关键文件做 `git diff` 摘要（口头归纳即可）。
+2. **测试**：对本次改动运行项目约定测试（本仓库默认：`python -m unittest discover -s tests -p 'test_*.py' -v`）；若失败，在方案里说明，**仍不执行 commit**，先修或请用户决定。
+3. **交付物**（必须逐项给出，便于用户复制确认）：
+   - **建议暂存列表**：按文件路径列出，注明是否建议纳入本次提交。
+   - **1～N 个 commit 方案**（至少 1 个）：命名为 **方案 A、方案 B…**。每个方案包含：
+     - 建议的 `git add` 范围（文件或目录）。
+     - **完整 commit message（一律英文）**：使用 [Conventional Commits](https://www.conventionalcommits.org/)，`type(scope): English summary`，例如 `feat(ui): table layout for fog observation`。多方案时每条 message 编号 **第 1 条、第 2 条…** 与方案对应。
+   - **风险提示**：疑似秘钥/大文件/生成物，须点名。
+4. **阶段结束固定提示**（原样或等价表述）：
+
+> 请确认后我再执行：写明 **方案字母**、**message**（用「第 N 条」或粘贴完整 subject）、**是否 push**（是/否）。未收到明确确认前不执行 `git add` / `git commit` / `git push`。
+
+## 第二阶段（确认后执行）
+
+仅在用户**后续一条消息中明确确认**后执行：
+
+- 按用户选的方案执行 `git add` 与 `git commit -m "..."`（**subject/body 必须为英文**；以用户确认的文案为准，若用户给中文须改写为等价英文后再提交）。
+- 用户写 **「不 push」** 或 **未要求 push** → **禁止** `git push`。
+- **保护分支**：禁止向 `main`、`master`、`yc_dev`、`production` 等保护分支直接 push；应使用新功能分支并建议用户开 MR/PR（与仓库工作流一致）。
+
+若用户确认含糊（未指定方案或 message），**先追问一句**，不要猜测执行。
+
+## 用户确认示例（Agent 应能解析）
+
+- 「采用方案 A，message 用第 1 条，不 push」
+- 「方案 B，message 用你写的第二条原文，push 到 origin feature/foo」
