@@ -36,6 +36,20 @@ class TestDisplay(unittest.TestCase):
         self.assertIn("获胜", buf.getvalue())
 
 
+class TestWaitPressToStart(unittest.TestCase):
+    def test_prints_prompt_and_reads_once(self) -> None:
+        buf = io.StringIO()
+        calls: list[str] = []
+
+        def fake_input(prompt: str) -> str:
+            calls.append(prompt)
+            return ""
+
+        input_handler.wait_press_to_start(input_fn=fake_input, out=buf)
+        self.assertIn("回车", buf.getvalue())
+        self.assertEqual(calls, [""])
+
+
 class TestInputHandler(unittest.TestCase):
     def test_collect_one_valid_command(self) -> None:
         a = Region("a", [2], 10)

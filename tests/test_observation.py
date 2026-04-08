@@ -32,9 +32,15 @@ class TestObservation(unittest.TestCase):
         on = obs.regions[3]
         assert oa is not None and ob is not None and on is not None
         self.assertEqual(oa.troops, 10)
+        self.assertEqual(oa.is_capital, False)
+        self.assertEqual(oa.base_growth, 4)
         self.assertIsNone(ob.troops)
+        self.assertIsNone(ob.is_capital)
+        self.assertIsNone(ob.base_growth)
         self.assertEqual(ob.owner, 2)
         self.assertIsNone(on.troops)
+        self.assertIsNone(on.is_capital)
+        self.assertIsNone(on.base_growth)
         self.assertEqual(on.owner, 0)
 
 

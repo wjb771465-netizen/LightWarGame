@@ -2,10 +2,22 @@
 
 from __future__ import annotations
 
-from typing import Callable, List
+import sys
+from typing import Callable, List, Optional, TextIO
 
 from game.datatypes.command import Command
 from game.datatypes.state import GameState
+
+
+def wait_press_to_start(
+    input_fn: Callable[[str], str] | None = None,
+    out: Optional[TextIO] = None,
+) -> None:
+    """输出提示后等待一行输入（通常为回车），用于开局确认。"""
+    o = out or sys.stdout
+    print("\n按回车键开始游戏…", file=o, flush=True)
+    inp = input_fn or input
+    inp("")
 
 
 def collect_commands_for_player(

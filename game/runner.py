@@ -23,9 +23,10 @@ class GameRunner:
         state = self.state
         ui = self.ui
         ui.show_turn_start(state)
+        ui.show_state(state)
         commands: List[Command] = []
         for p in state.active_players:
-            ui.show_state(state, p)
+            ui.show_observation(state.get_observation(p))
             commands.extend(ui.collect_commands(state, p))
         valid_cmds = state.check_cmds(commands)
         state.apply_cmds(valid_cmds)
@@ -35,6 +36,7 @@ class GameRunner:
     def run(self) -> None:
         """展示开局 → `while run_single_turn()` → 展示终局。"""
         self.ui.show_game_start(self.state)
+        self.ui.wait_after_welcome()
         while self.run_single_turn():
             pass
         self.ui.show_game_result(self.state)
