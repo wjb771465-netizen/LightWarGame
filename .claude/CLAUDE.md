@@ -1,4 +1,18 @@
-# LightWarGame 测试规范
+# LightWarGame 开发规范
+
+## Git 工作流
+
+本仓库为个人独立开发，**直接在 `master` 分支提交和推送，不建 feature 分支**。
+
+```bash
+git add <文件>
+git commit -m "..."
+git push origin master
+```
+
+---
+
+# 测试规范
 
 ## 测试框架与入口
 

@@ -47,6 +47,7 @@ class GameUiPort(Protocol):
         ...
 
 
+
 class PlaceholderGameUi:
     """占位：`show_*` 为空，`collect_commands` 返回空列表。"""
 

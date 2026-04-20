@@ -56,9 +56,10 @@ class Region:
 class GameMap:
     """版图：合法 id / 邻接校验、兵力增长、按指令更新地区。"""
 
-    __slots__ = ("regions",)
+    __slots__ = ("regions", "_config_name")
 
     def __init__(self, config_name: str = "cn") -> None:
+        self._config_name = config_name
         self.regions = self._load_regions(parse_map_config(config_name))
 
     def assign_capitals(self, capitals: Sequence[int]) -> None:

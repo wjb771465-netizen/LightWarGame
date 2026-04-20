@@ -1,18 +1,20 @@
 from __future__ import annotations
 
-from typing import List
+from typing import List, Optional
 
 from game.datatypes.command import Command
 from game.datatypes.state import GameState
+from game.save_load import save_game
 from game.ui_ports import GameUiPort
 
 
 class GameRunner:
     """主循环：按 UI 约定展示 → 收集指令 → `check_cmds` → `apply_cmds` → `settle`，直至终局。"""
 
-    def __init__(self, state: GameState, ui: GameUiPort) -> None:
+    def __init__(self, state: GameState, ui: GameUiPort, save_path: Optional[str] = None) -> None:
         self.state = state
         self.ui = ui
+        self._save_path = save_path
 
     def run_single_turn(self) -> bool:
         """
@@ -38,5 +40,6 @@ class GameRunner:
         self.ui.show_game_start(self.state)
         self.ui.wait_after_welcome()
         while self.run_single_turn():
-            pass
+            if self._save_path:
+                save_game(self.state, self._save_path)
         self.ui.show_game_result(self.state)
