@@ -5,12 +5,7 @@ from game.datatypes.game_map import GameMap, Region
 from game.datatypes.state import GameState
 
 from tests.constants import MAP_CONFIG
-
-
-def _map_with_regions(regions):
-    m = GameMap.__new__(GameMap)
-    m.regions = regions
-    return m
+from tests.helpers import map_with_regions as _map_with_regions
 
 
 class TestGameMap(unittest.TestCase):

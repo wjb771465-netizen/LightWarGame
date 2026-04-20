@@ -1,7 +1,6 @@
 import io
 import unittest
 
-from game.datatypes.game_map import GameMap, Region
 from game.datatypes.game_obs import Observation, RegionObservation
 from game.ui import display
 

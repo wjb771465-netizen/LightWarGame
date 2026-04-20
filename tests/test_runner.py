@@ -5,11 +5,7 @@ from game.datatypes.state import GameState
 from game.runner import GameRunner
 from game.ui_ports import PlaceholderGameUi
 
-
-def _map_with_regions(regions):
-    m = GameMap.__new__(GameMap)
-    m.regions = regions
-    return m
+from tests.helpers import map_with_regions as _map_with_regions
 
 
 class TestGameRunner(unittest.TestCase):

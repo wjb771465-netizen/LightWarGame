@@ -4,11 +4,7 @@ from game.datatypes.game_map import GameMap, Region
 from game.datatypes.game_obs import build_observation
 from game.datatypes.state import GameState
 
-
-def _map_with_regions(regions):
-    m = GameMap.__new__(GameMap)
-    m.regions = regions
-    return m
+from tests.helpers import map_with_regions as _map_with_regions
 
 
 class TestObservation(unittest.TestCase):

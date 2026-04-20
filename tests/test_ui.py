@@ -7,11 +7,7 @@ from game.ui import display
 from game.ui import input_handler
 from game.ui.terminal_ui import TerminalGameUi
 
-
-def _map_with_regions(regions):
-    m = GameMap.__new__(GameMap)
-    m.regions = regions
-    return m
+from tests.helpers import map_with_regions as _map_with_regions
 
 
 class TestDisplay(unittest.TestCase):
