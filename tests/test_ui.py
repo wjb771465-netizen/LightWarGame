@@ -1,4 +1,6 @@
 import io
+import os
+import tempfile
 import unittest
 
 from game.datatypes.game_map import GameMap, Region
@@ -86,6 +88,33 @@ class TestTerminalGameUi(unittest.TestCase):
         s = GameState(m, num_players=2)
         ui.show_game_start(s)
         self.assertEqual(ui.collect_commands(s, 1), [])
+
+
+class TestMapRenderer(unittest.TestCase):
+    def test_name_normalize(self) -> None:
+        from game.ui.map_renderer import _normalize_name
+        cases = [
+            ("内蒙古自治区", "内蒙古"),
+            ("广西壮族自治区", "广西"),
+            ("新疆维吾尔自治区", "新疆"),
+            ("宁夏回族自治区", "宁夏"),
+            ("北京市", "北京"),
+            ("四川省", "四川"),
+            ("西藏自治区", "西藏"),
+        ]
+        for raw, expected in cases:
+            with self.subTest(raw=raw):
+                self.assertEqual(_normalize_name(raw), expected)
+
+    def test_render_creates_file(self) -> None:
+        from game.ui.map_renderer import render_map
+        from init_game import fixed_capitals
+        state = fixed_capitals([1, 2])
+        with tempfile.TemporaryDirectory() as d:
+            path = os.path.join(d, "test_map.png")
+            render_map(state, path)
+            self.assertTrue(os.path.exists(path))
+            self.assertGreater(os.path.getsize(path), 0)
 
 
 if __name__ == "__main__":

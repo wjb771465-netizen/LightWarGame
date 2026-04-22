@@ -2,14 +2,19 @@
 
 from __future__ import annotations
 
+from pathlib import Path
+
 from game.runner import GameRunner
 from game.ui.terminal_ui import TerminalGameUi
 from init_game import from_save, random_capitals
 
-SAVE_PATH = "save.json"
+SAVES_DIR = "saves"
+SAVE_PATH = f"{SAVES_DIR}/save.json"
+MAP_DIR = SAVES_DIR
 
 
 def main() -> None:
+    Path(SAVES_DIR).mkdir(exist_ok=True)
     print("=== LightWarGame ===")
     print("[1] 新游戏")
     print(f"[2] 读取存档 ({SAVE_PATH})")
@@ -21,7 +26,7 @@ def main() -> None:
     else:
         state = random_capitals()
 
-    GameRunner(state, TerminalGameUi(), save_path=SAVE_PATH).run()
+    GameRunner(state, TerminalGameUi(), save_path=SAVE_PATH, map_dir=MAP_DIR).run()
 
 
 if __name__ == "__main__":

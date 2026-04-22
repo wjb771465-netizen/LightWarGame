@@ -1,20 +1,23 @@
 from __future__ import annotations
 
 from typing import List, Optional
+import os
 
 from game.datatypes.command import Command
 from game.datatypes.state import GameState
 from game.save_load import save_game
 from game.ui_ports import GameUiPort
+from game.ui.map_renderer import render_map
 
 
 class GameRunner:
     """主循环：按 UI 约定展示 → 收集指令 → `check_cmds` → `apply_cmds` → `settle`，直至终局。"""
 
-    def __init__(self, state: GameState, ui: GameUiPort, save_path: Optional[str] = None) -> None:
+    def __init__(self, state: GameState, ui: GameUiPort, save_path: Optional[str] = None, map_dir: Optional[str] = None) -> None:
         self.state = state
         self.ui = ui
         self._save_path = save_path
+        self._map_dir = map_dir
 
     def run_single_turn(self) -> bool:
         """
@@ -25,7 +28,7 @@ class GameRunner:
         state = self.state
         ui = self.ui
         ui.show_turn_start(state)
-        ui.show_state(state)
+        #ui.show_state(state)
         commands: List[Command] = []
         for p in state.active_players:
             ui.show_observation(state.get_observation(p))
@@ -33,6 +36,10 @@ class GameRunner:
         valid_cmds = state.check_cmds(commands)
         state.apply_cmds(valid_cmds)
         ui.show_turn_results(state)
+        if self._map_dir:
+            path = os.path.join(self._map_dir, f"map_turn_{state.turn:03d}.png")
+            render_map(state, path)
+            print(f"[地图] 已保存 → {path}")
         return not state.settle()
 
     def run(self) -> None:
