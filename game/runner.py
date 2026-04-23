@@ -1,9 +1,11 @@
 from __future__ import annotations
 
-from typing import List, Optional
+import json
 import os
+from typing import List, Optional
 
 from game.datatypes.command import Command
+from game.datatypes.game_obs import observation_to_dict
 from game.datatypes.state import GameState
 from game.save_load import save_game
 from game.ui_ports import GameUiPort
@@ -31,7 +33,12 @@ class GameRunner:
         #ui.show_state(state)
         commands: List[Command] = []
         for p in state.active_players:
-            ui.show_observation(state.get_observation(p))
+            obs = state.get_observation(p)
+            ui.show_observation(obs)
+            if self._map_dir:
+                obs_path = os.path.join(self._map_dir, f"obs_p{p}.json")
+                with open(obs_path, "w", encoding="utf-8") as f:
+                    json.dump(observation_to_dict(obs, state.game_map), f, ensure_ascii=False, indent=2)
             commands.extend(ui.collect_commands(state, p))
         valid_cmds = state.check_cmds(commands)
         state.apply_cmds(valid_cmds)
