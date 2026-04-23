@@ -26,8 +26,8 @@ def collect_commands_for_player(
     input_fn: Callable[[str], str] | None = None,
 ) -> List[Command]:
     """
-    提示并循环读取 `源,目标,兵力`；空行结束。
-    校验基于 game_map 真值（非迷雾）。
+    提示并循环读取 `源,目标,兵力`；空行或达到上限时结束。
+    上限 = max(1, 己方领地数 // 3)。校验基于 game_map 真值（非迷雾）。
     """
     inp = input_fn or input
     regions = state.game_map.regions
@@ -40,9 +40,13 @@ def collect_commands_for_player(
         print(f"玩家 {player_id} 没有领地，跳过指令输入")
         return []
 
-    print(f"\n玩家 {player_id} 下达指令（格式: 源,目标,兵力；回车结束）")
+    max_commands = max(1, len(player_regions) // 3)
+    print(f"\n玩家 {player_id} 下达指令（格式: 源,目标,兵力；回车结束，上限 {max_commands} 条）")
     commands: List[Command] = []
     while True:
+        if len(commands) >= max_commands:
+            print(f"已达上限 {max_commands} 条，自动结束")
+            break
         line = inp("> ").strip()
         if not line:
             print(f"玩家 {player_id} 指令结束，共 {len(commands)} 条")
