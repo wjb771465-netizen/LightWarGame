@@ -1,108 +1,92 @@
-# ai/envs/action.py
+from __future__ import annotations
+
+import math
+from typing import List, Optional, Tuple
+
+import gymnasium as gym
 import numpy as np
-from typing import List, Optional
-from game import Command
+
+from game.datatypes.command import Command
+from game.datatypes.game_map import GameMap
+from game.datatypes.game_obs import Observation
+
+_TROOP_BUCKETS: Tuple[float, ...] = (0.25, 0.5, 0.75, 1.0)
 
 
-class ActionSpace:
+class ActionEncoder:
     """
-    动作空间：0~999出兵动作 + 1000 = EOS（结束本回合）
-    编码方式:
-        old_action = src*100 + tgt*3 + ratio_idx
-        new_action = old_action
-        EOS = 1000
+    动作空间封装。
+
+    动作编码（Discrete）：
+      index 0          = no-op
+      index 1..E*B     = (edge_idx, bucket_idx)，k = 1 + edge_idx*B + bucket_idx
+
+    edge_list 从地图邻接关系构建，排序固定化，初始化后不可变。
+    bucket 为出兵比例档位，基数 = src.troops - 1。
     """
-    def __init__(self, max_actions: int = 3200, max_commands_per_turn=8):
-        self.old_max = max_actions
-        self.EOS = max_actions  # EOS = 1000
-        self.max_actions = max_actions + 1
-        self.max_commands_per_turn = max_commands_per_turn
 
-        self.ratios = [1 / 3, 1 / 2, 2 / 3]
-        self.num_ratios = len(self.ratios)
+    def __init__(self, game_map: GameMap) -> None:
+        self._game_map = game_map
+        self._edges: List[Tuple[int, int]] = self._build_edge_list(game_map)
+        self._B = len(_TROOP_BUCKETS)
+        self.dim = len(self._edges) * self._B + 1  # +1 for no-op
 
-    # --------------------------
-    # 编码 / 解码
-    # --------------------------
-    def encode(self, src: int, tgt: int, ratio_idx: int) -> int:
-        """保持原编码（0–999），不加偏移"""
-        return src * 100 + tgt * 3 + ratio_idx
+    @property
+    def space(self) -> gym.spaces.Discrete:
+        return gym.spaces.Discrete(self.dim)
 
-    def decode(self, action_id: int, game_state: dict, player_id: int):
-        """解码动作或 EOS"""
-        if action_id == self.EOS:
-            return "EOS"
+    def mask(
+        self,
+        obs: Observation,
+        commands_issued: int,
+        max_commands: int,
+    ) -> np.ndarray:
+        """
+        计算合法动作的 bool 掩码，长度 = self.dim。
 
-        if action_id < 0 or action_id >= self.old_max:
-            return None
+        index 0（no-op）始终合法。
+        index k>0 合法条件：尚有配额 AND src 归 viewer AND src.troops > 1。
+        """
+        result = np.zeros(self.dim, dtype=bool)
+        result[0] = True
 
-        raw = action_id
-        src = raw // 100
-        tgt = (raw % 100) // 3
-        ratio_idx = raw % 3
+        if commands_issued >= max_commands:
+            return result
 
-        regions = game_state["regions"]
-
-        if src < 1 or src >= 32 or tgt < 1 or tgt >= 32:
-            return None
-        if regions[src].owner != player_id:
-            return None
-        if tgt not in regions[src].adjacent:
-            return None
-
-        r = regions[src]
-        if r.troops <= 1:
-            return None
-
-        ratio = self.ratios[ratio_idx]
-        troops = max(1, int(r.troops * ratio))
-        if troops >= r.troops:
-            return None
-
-        return Command(source=src, target=tgt, troops=troops, player=player_id)
-
-    # --------------------------
-    # 合法动作
-    # --------------------------
-    def get_valid_actions(self, game_state: dict, player_id: int):
-        valid = []
-
-        regions = game_state["regions"]
-        my_regions = [i for i in range(1, 32) if regions[i].owner == player_id]
-
-        for src in my_regions:
-            r = regions[src]
-            if r.troops <= 1:
+        game_map = self._game_map
+        viewer_id = obs.viewer_id
+        B = self._B
+        for edge_idx, (src_id, _tgt_id) in enumerate(self._edges):
+            region = game_map.regions[src_id]
+            if region is None or region.owner != viewer_id or region.troops <= 1:
                 continue
-            for tgt in r.adjacent:
-                if not (1 <= tgt < 32):
-                    continue
-                for ratio_idx in range(self.num_ratios):
-                    ratio = self.ratios[ratio_idx]
-                    troops = max(1, int(r.troops * ratio))
-                    if troops >= r.troops:
-                        continue
+            base = 1 + edge_idx * B
+            result[base : base + B] = True
 
-                    aid = self.encode(src, tgt, ratio_idx)
-                    if 0 <= aid < self.old_max:
-                        valid.append(aid)
+        return result
 
-        # EOS 永远合法（用于结束回合）
-        valid.append(self.EOS)
+    def decode(self, action: int, player_id: int) -> Optional[Command]:
+        """将动作索引解码为 Command；no-op（index 0）返回 None。"""
+        if action == 0:
+            return None
 
-        return valid
+        edge_idx, bucket_idx = divmod(action - 1, self._B)
+        src_id, tgt_id = self._edges[edge_idx]
+        region = self._game_map.regions[src_id]
+        assert region is not None
 
-    # --------------------------
-    # 动作 mask
-    # --------------------------
-    def get_mask(self, game_state: dict, player_id: int, current_cmd_count):
-        mask = np.zeros(self.max_actions, dtype=bool)
-        #if current_cmd_count >= self.max_commands_per_turn:
-            # 超出命令数：只能 EOS
-            #return mask
+        available = region.troops - 1
+        troops = max(1, math.floor(available * _TROOP_BUCKETS[bucket_idx]))
+        return Command(source=src_id, target=tgt_id, troops=troops, player=player_id)
 
-        for aid in self.get_valid_actions(game_state, player_id):
-            mask[aid] = True
-
-        return mask
-
+    @staticmethod
+    def _build_edge_list(game_map: GameMap) -> List[Tuple[int, int]]:
+        edges: List[Tuple[int, int]] = []
+        for src_id in range(1, len(game_map.regions)):
+            region = game_map.regions[src_id]
+            if region is None:
+                continue
+            for tgt_id in region.adjacent:
+                edges.append((src_id, tgt_id))
+        edges.sort()
+        return edges
