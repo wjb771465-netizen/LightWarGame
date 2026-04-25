@@ -23,7 +23,6 @@ def get_config() -> argparse.ArgumentParser:
     parser = _get_ppo_config(parser)
     parser = _get_save_config(parser)
     parser = _get_eval_config(parser)
-    parser = _get_render_config(parser)
     parser = _get_log_config(parser)
     return parser
 
@@ -132,27 +131,6 @@ def _get_eval_config(parser: argparse.ArgumentParser) -> argparse.ArgumentParser
                        help="每隔多少步做一次评估（default: 50_000）")
     group.add_argument("--eval-episodes", type=int, default=100,
                        help="每次评估运行的局数（default: 100）")
-    return parser
-
-
-# ---------------------------------------------------------------------------
-# Render
-# ---------------------------------------------------------------------------
-
-def _get_render_config(parser: argparse.ArgumentParser) -> argparse.ArgumentParser:
-    """
-    Render parameters:
-        --render
-            推理模式：加载 <save-dir>/final.zip，运行完整对局并存图。
-            不传则走正常训练流程。
-        --render-episodes <int>
-            render 模式下运行的局数（default: 1）
-    """
-    group = parser.add_argument_group("Render parameters")
-    group.add_argument("--render", action="store_true", default=False,
-                       help="推理模式：加载 final.zip，运行完整对局并存图至 <save-dir>/renders/")
-    group.add_argument("--render-episodes", type=int, default=1,
-                       help="render 模式下运行的局数（default: 1）")
     return parser
 
 
