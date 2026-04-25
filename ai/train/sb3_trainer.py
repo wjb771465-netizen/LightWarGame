@@ -95,52 +95,11 @@ def train(args) -> None:
     print(f"模型已保存至 {save_dir}/final.zip")
 
 
-def render(args) -> None:
-    """加载 final.zip，运行完整对局并存图（训练后用）。"""
-    save_dir = _resolve_save_dir(args)
-    model_path = os.path.join(save_dir, "final")
-    assert os.path.exists(model_path + ".zip"), f"找不到模型：{model_path}.zip，请先训练"
-
-    render_dir = os.path.join(save_dir, "renders")
-    os.makedirs(render_dir, exist_ok=True)
-
-    model = MaskablePPO.load(model_path)
-    scenario = args.scenario
-
-    for ep in range(args.render_episodes):
-        env = LwgEnv(scenario)
-        obs, _ = env.reset()
-        step = 0
-        while True:
-            env.render(os.path.join(render_dir, f"ep{ep:02d}_turn_{step:04d}.png"))
-            mask = env.action_masks()
-            action, _ = model.predict(obs, action_masks=mask, deterministic=True)
-            obs, _, terminated, truncated, _ = env.step(int(action))
-            step += 1
-            if terminated or truncated:
-                break
-
-        env.render(os.path.join(render_dir, f"ep{ep:02d}_turn_{step:04d}_final.png"))
-        winner = env._state.winner()
-        outcome = (
-            "agent wins" if winner == env.agent_id
-            else "opponent wins" if winner is not None
-            else "draw (timeout)"
-        )
-        print(f"ep {ep:02d} | {step} 回合 | {outcome}")
-
-    print(f"渲染图像已保存至 {render_dir}")
-
-
 def main() -> None:
     parser = get_config()
     args = parser.parse_args()
     _set_seeds(args.seed)
-
-    if args.render:
-        render(args)
-    else:
-        train(args)
+    train(args)
 
 
 if __name__ == "__main__":

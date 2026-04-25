@@ -12,7 +12,7 @@ import numpy as np
 
 from ai.envs.env import LwgEnv
 
-CONFIG = "two_players/vsbaseline"
+CONFIG = "1v1/vsbaseline"
 
 
 class TestLwgEnvInit(unittest.TestCase):
