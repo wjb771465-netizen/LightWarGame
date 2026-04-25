@@ -10,6 +10,7 @@ from sb3_contrib import MaskablePPO
 from stable_baselines3.common.callbacks import CheckpointCallback, EvalCallback
 from stable_baselines3.common.env_util import make_vec_env
 from stable_baselines3.common.logger import configure
+from stable_baselines3.common.vec_env import VecMonitor
 
 from ai.train.args import get_config
 from ai.envs.env import LwgEnv
@@ -31,10 +32,11 @@ def _set_seeds(seed: int) -> None:
 def train(args) -> None:
     save_dir = _resolve_save_dir(args)
     os.makedirs(save_dir, exist_ok=True)
+    tb_log_dir = os.path.join(save_dir, "tb")
 
     scenario = args.scenario
-    env = make_vec_env(lambda: LwgEnv(scenario), n_envs=1)
-    eval_env = make_vec_env(lambda: LwgEnv(scenario), n_envs=1)
+    env = VecMonitor(make_vec_env(lambda: LwgEnv(scenario), n_envs=1))
+    eval_env = VecMonitor(make_vec_env(lambda: LwgEnv(scenario), n_envs=1))
 
     model = MaskablePPO(
         "MlpPolicy",
@@ -49,6 +51,7 @@ def train(args) -> None:
         clip_range=args.clip_range,
         verbose=1,
         seed=args.seed,
+        tensorboard_log=tb_log_dir,
     )
 
     project = args.wandb_project or args.scenario.split("/")[0]
@@ -75,7 +78,14 @@ def train(args) -> None:
         import wandb
         from wandb.integration.sb3 import WandbCallback
 
-        wandb.init(project=project, name=exp_name, config=vars(args), dir=save_dir)
+        wandb.init(
+            project=project,
+            name=exp_name,
+            config=vars(args),
+            dir=save_dir,
+            sync_tensorboard=True,
+            monitor_gym=True,
+        )
         callbacks.append(WandbCallback(verbose=2))
     else:
         model.set_logger(configure(folder=None, format_strings=["stdout"]))
