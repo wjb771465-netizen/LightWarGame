@@ -156,13 +156,13 @@ class TestActionEncoder(unittest.TestCase):
         self.assertTrue(mask[base:base + 4].any())
 
     def test_decode_noop_returns_none(self):
-        self.assertIsNone(self.enc.decode(0, player_id=1))
+        self.assertIsNone(self.enc.decode(0, player_id=1, game_map=self.gm))
 
     def test_decode_troops_25_percent(self):
         # region1 有 20 兵，available=19，bucket 0.25 → floor(19*0.25)=4
         edge_idx = self.enc._edges.index((1, 2))
         action = 1 + edge_idx * 4 + 0  # bucket_idx=0 → 25%
-        cmd = self.enc.decode(action, player_id=1)
+        cmd = self.enc.decode(action, player_id=1, game_map=self.gm)
         self.assertIsNotNone(cmd)
         self.assertEqual(cmd.source, 1)
         self.assertEqual(cmd.target, 2)
@@ -172,13 +172,13 @@ class TestActionEncoder(unittest.TestCase):
         # bucket 1.0 → floor(19*1.0)=19
         edge_idx = self.enc._edges.index((1, 2))
         action = 1 + edge_idx * 4 + 3  # bucket_idx=3 → 100%
-        cmd = self.enc.decode(action, player_id=1)
+        cmd = self.enc.decode(action, player_id=1, game_map=self.gm)
         self.assertEqual(cmd.troops, 19)
 
     def test_decode_player_id_set(self):
         edge_idx = self.enc._edges.index((1, 2))
         action = 1 + edge_idx * 4 + 0
-        cmd = self.enc.decode(action, player_id=1)
+        cmd = self.enc.decode(action, player_id=1, game_map=self.gm)
         self.assertEqual(cmd.player, 1)
 
 

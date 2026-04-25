@@ -46,6 +46,8 @@ class ActionEncoder:
 
         index 0（no-op）始终合法。
         index k>0 合法条件：尚有配额 AND src 归 viewer AND src.troops > 1。
+
+        owner/troops 从 obs.regions 读取（当前回合实际状态），不依赖模板地图。
         """
         result = np.zeros(self.dim, dtype=bool)
         result[0] = True
@@ -53,26 +55,28 @@ class ActionEncoder:
         if commands_issued >= max_commands:
             return result
 
-        game_map = self._game_map
         viewer_id = obs.viewer_id
         B = self._B
         for edge_idx, (src_id, _tgt_id) in enumerate(self._edges):
-            region = game_map.regions[src_id]
-            if region is None or region.owner != viewer_id or region.troops <= 1:
+            r_obs = obs.regions[src_id]
+            if r_obs is None or r_obs.owner != viewer_id or (r_obs.troops or 0) <= 1:
                 continue
             base = 1 + edge_idx * B
             result[base : base + B] = True
 
         return result
 
-    def decode(self, action: int, player_id: int) -> Optional[Command]:
-        """将动作索引解码为 Command；no-op（index 0）返回 None。"""
+    def decode(self, action: int, player_id: int, game_map: GameMap) -> Optional[Command]:
+        """将动作索引解码为 Command；no-op（index 0）返回 None。
+
+        game_map 为当前回合的实际地图，用于读取 src 的真实兵力。
+        """
         if action == 0:
             return None
 
         edge_idx, bucket_idx = divmod(action - 1, self._B)
         src_id, tgt_id = self._edges[edge_idx]
-        region = self._game_map.regions[src_id]
+        region = game_map.regions[src_id]
         assert region is not None
 
         available = region.troops - 1

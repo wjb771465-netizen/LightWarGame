@@ -7,3 +7,5 @@ dependencies:             # 需要安装的包列表
   - pip                   
   - numpy
   - matplotlib
+  - pyyaml
+  - gymnasium

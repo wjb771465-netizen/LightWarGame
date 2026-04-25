@@ -1,0 +1,19 @@
+game:
+  map_config: cn
+  num_players: 2
+  max_players: 6
+  max_turns: 150
+  capital_mode: fixed
+  capitals: [8, 25]        # 黑龙江(东北) vs 云南(西南)
+
+reward:
+  win: 100.0
+  lose: -100.0
+  shaped:
+    territory_gain: 5.0
+    territory_loss: -5.0
+    capital_capture: 20.0
+
+training:
+  mode: vsbaseline          # 训练范式：vsbaseline | self_play
+  opponent: random          # 对手类型：random | rule

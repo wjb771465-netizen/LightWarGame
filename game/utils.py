@@ -4,7 +4,7 @@ from typing import Any, Dict, List, Tuple
 
 
 def get_project_root() -> Path:
-    """仓库根目录（含 configs/ 的 ChineseWarGame 根）。"""
+    """仓库根目录（含 data/ 的 ChineseWarGame 根）。"""
     return Path(__file__).resolve().parent.parent
 
 
