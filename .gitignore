@@ -41,8 +41,9 @@ saves/
 # 参考文件
 ref
 
-# 训练产物（checkpoints / wandb / renders）
+# 训练/渲染产物
 ai/train/results/
+ai/renders/results/
 *.pt
 *.pth
 *.ckpt
