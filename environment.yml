@@ -9,3 +9,8 @@ dependencies:             # 需要安装的包列表
   - matplotlib
   - pyyaml
   - gymnasium
+  - pip:
+    - torch>=2.0
+    - stable-baselines3
+    - sb3-contrib
+    - wandb

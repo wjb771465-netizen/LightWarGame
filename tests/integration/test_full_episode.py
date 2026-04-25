@@ -25,8 +25,8 @@ class TestFullEpisode(unittest.TestCase):
 
     def test_full_episode_with_renders(self):
         """完整跑一局，每 10 回合 + 终局各存一张地图 PNG，打印对局摘要。"""
-        random.seed(42)
-        np.random.seed(42)
+        random.seed(5)
+        np.random.seed(5)
         os.makedirs(_OUT_DIR, exist_ok=True)
 
         env = LwgEnv(CONFIG)

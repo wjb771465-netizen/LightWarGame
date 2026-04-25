@@ -46,7 +46,7 @@ ai/logs/
 ai/logs_multi/
 
 # 模型权重（按需：若希望提交演示用小模型可改为更窄规则）
-ai/models/*.zip
+ai/checkpoints/
 *.pt
 *.pth
 *.ckpt

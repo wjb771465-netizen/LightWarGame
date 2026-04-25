@@ -4,7 +4,7 @@ game:
   max_players: 6
   max_turns: 150
   capital_mode: fixed
-  capitals: [4, 20]        #河北(4) vs 江西(20)
+  capitals: [8, 25]        # 黑龙江(东北) vs 云南(西南)
 
 reward:
   win: 100.0
@@ -15,5 +15,4 @@ reward:
     capital_capture: 20.0
 
 training:
-  mode: vsbaseline          # 训练范式：vsbaseline | self_play
-  opponent: random          # 对手类型：random | rule
+  opponent: rule
