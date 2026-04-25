@@ -1,14 +1,14 @@
 #!/usr/bin/env bash
 # 对战规则对手训练
-# 用法：bash scripts/train_vsrule.sh [额外参数]
+# 用法：bash ai/train/train_vsrule.sh [额外参数]
 set -euo pipefail
 
-SCENARIO="two_players/vsrule"
+SCENARIO="1v1/vsrule"
 EXP_NAME="vsrule_mlp256"
 
-cd "$(dirname "$0")/.."
+cd "$(dirname "$0")/../.."
 
-conda run -n chinese_war_game python -m ai.trainer \
+conda run -n chinese_war_game python -m ai.train.sb3_trainer \
   --scenario "$SCENARIO" \
   --exp-name "$EXP_NAME" \
   --total-timesteps 2000000 \

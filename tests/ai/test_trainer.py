@@ -1,5 +1,5 @@
 """
-ai/trainer.py 的单元测试。
+ai/train/sb3_trainer.py 的单元测试。
 
 验证：MaskablePPO 能跑通短训练、args 字段可读、checkpoint 能写入磁盘。
 """
@@ -10,11 +10,11 @@ import unittest
 from sb3_contrib import MaskablePPO
 from stable_baselines3.common.env_util import make_vec_env
 
-from ai.args import get_config
+from ai.train.args import get_config
 from ai.envs.env import LwgEnv
 from ai.envs.utils import parse_config
 
-SCENARIO = "two_players/vsbaseline"
+SCENARIO = "1v1/vsbaseline"
 SHORT_STEPS = 1024
 
 
@@ -34,14 +34,15 @@ class TestMaskablePPOIntegration(unittest.TestCase):
         self.assertIsNotNone(model.policy)
 
     def test_args_scenario_parsed(self):
-        """get_config 解析 --scenario 后，save_dir 默认为 ai/checkpoints/<scenario>。"""
-        from ai.trainer import _resolve_save_dir
+        """get_config 解析 --scenario 后，save_dir 默认含 ai/train/results/<scenario>/run_ 前缀。"""
+        from ai.train.sb3_trainer import _resolve_save_dir
         parser = get_config()
         args = parser.parse_args(["--scenario", SCENARIO])
         self.assertEqual(args.scenario, SCENARIO)
         self.assertIsNone(args.save_dir)
         resolved = _resolve_save_dir(args)
-        self.assertEqual(resolved, os.path.join("ai", "checkpoints", SCENARIO))
+        expected_prefix = os.path.join("ai", "train", "results", SCENARIO, "run_")
+        self.assertTrue(resolved.startswith(expected_prefix), resolved)
 
     def test_env_config_loaded(self):
         """parse_config 能读取 vsbaseline.yaml，training.opponent 字段存在。"""

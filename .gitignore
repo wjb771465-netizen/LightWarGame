@@ -41,12 +41,8 @@ saves/
 # 参考文件
 ref
 
-# 训练产物（TensorBoard / SB3 等）
-ai/logs/
-ai/logs_multi/
-
-# 模型权重（按需：若希望提交演示用小模型可改为更窄规则）
-ai/checkpoints/
+# 训练产物（checkpoints / wandb / renders）
+ai/train/results/
 *.pt
 *.pth
 *.ckpt

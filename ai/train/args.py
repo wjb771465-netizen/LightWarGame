@@ -2,12 +2,12 @@
 训练参数配置。
 
 用法：
-    from ai.args import get_config
+    from ai.train.args import get_config
     parser = get_config()
     args = parser.parse_args()
 
---scenario 决定 env 配置路径，并作为 checkpoint 目录的默认后缀：
-    ai/checkpoints/<scenario>/
+--scenario 决定 env 配置路径，并作为结果目录的默认后缀：
+    ai/train/results/<scenario>/
 """
 from __future__ import annotations
 
@@ -37,14 +37,14 @@ def _get_prepare_config(parser: argparse.ArgumentParser) -> argparse.ArgumentPar
     Prepare parameters:
         --scenario <str>
             env 配置名，路径相对于 ai/envs/configs/，如 two_players/vsbaseline。
-            同时作为 checkpoint 目录的默认后缀：ai/checkpoints/<scenario>/
+            同时作为结果目录的默认后缀：ai/train/results/<scenario>/
         --seed <int>
             random / numpy / torch 的全局种子（default: 42）
     """
     group = parser.add_argument_group("Prepare parameters")
     group.add_argument(
         "--scenario", type=str, required=True,
-        help="env 配置名，如 two_players/vsbaseline（同时决定默认 checkpoint 路径）",
+        help="env 配置名，如 two_players/vsbaseline（同时决定默认结果路径）",
     )
     group.add_argument(
         "--seed", type=int, default=42,
@@ -100,14 +100,14 @@ def _get_save_config(parser: argparse.ArgumentParser) -> argparse.ArgumentParser
     """
     Save parameters:
         --save-dir <str>
-            checkpoint 根目录；默认 ai/checkpoints/<scenario>
+            结果根目录；默认 ai/train/results/<scenario>
         --checkpoint-freq <int>
             每隔多少步保存一次 checkpoint（default: 100_000）
     """
     group = parser.add_argument_group("Save parameters")
     group.add_argument(
         "--save-dir", type=str, default=None,
-        help="checkpoint 根目录；不传则自动解析为 ai/checkpoints/<scenario>",
+        help="结果根目录；不传则自动解析为 ai/train/results/<scenario>",
     )
     group.add_argument("--checkpoint-freq", type=int, default=100_000,
                        help="每隔多少步保存一次 checkpoint（default: 100_000）")

@@ -1,34 +1,25 @@
-"""
-PPO 训练入口。
-
-训练：
-    conda run -n chinese_war_game python -m ai.trainer --scenario two_players/vsbaseline
-
-渲染（加载已训练模型，运行对局并存图）：
-    conda run -n chinese_war_game python -m ai.trainer --scenario two_players/vsbaseline --render
-
-或使用预设脚本：
-    bash scripts/train_vsrandom.sh
-"""
 from __future__ import annotations
 
 import os
 import random
+from datetime import datetime
 
 import numpy as np
 import torch
 from sb3_contrib import MaskablePPO
 from stable_baselines3.common.callbacks import CheckpointCallback, EvalCallback
 from stable_baselines3.common.env_util import make_vec_env
+from stable_baselines3.common.logger import configure
 
-from ai.args import get_config
+from ai.train.args import get_config
 from ai.envs.env import LwgEnv
 
 
 def _resolve_save_dir(args) -> str:
     if args.save_dir is not None:
         return args.save_dir
-    return os.path.join("ai", "checkpoints", args.scenario)
+    ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+    return os.path.join("ai", "train", "results", args.scenario, f"run_{ts}")
 
 
 def _set_seeds(seed: int) -> None:
@@ -84,8 +75,10 @@ def train(args) -> None:
         import wandb
         from wandb.integration.sb3 import WandbCallback
 
-        wandb.init(project=project, name=exp_name, config=vars(args))
-        callbacks.append(WandbCallback())
+        wandb.init(project=project, name=exp_name, config=vars(args), dir=save_dir)
+        callbacks.append(WandbCallback(verbose=2))
+    else:
+        model.set_logger(configure(folder=None, format_strings=["stdout"]))
 
     model.learn(total_timesteps=args.total_timesteps, callback=callbacks)
     model.save(os.path.join(save_dir, "final"))
