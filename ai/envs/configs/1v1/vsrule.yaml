@@ -10,9 +10,10 @@ reward:
   win: 100.0
   lose: -100.0
   shaped:
-    territory_gain: 5.0
-    territory_loss: -5.0
+    territory_gain: 1.0
+    territory_loss: -1.0
     capital_capture: 20.0
+    step_penalty: -0.5
 
 training:
   opponent: rule
