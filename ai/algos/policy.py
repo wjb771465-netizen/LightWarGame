@@ -16,6 +16,11 @@ class SB3Policy:
     def __init__(self, model_path: str) -> None:
         self._model = MaskablePPO.load(model_path)
 
+    @property
+    def obs_dim(self) -> int:
+        """模型期望的观测向量长度，用于反推 max_players。"""
+        return int(self._model.observation_space.shape[0])
+
     def predict(self, obs: np.ndarray, mask: np.ndarray) -> int:
         action, _ = self._model.predict(obs, action_masks=mask, deterministic=True)
         return int(action)

@@ -8,7 +8,7 @@ import numpy as np
 from game.datatypes.game_map import GameMap
 from game.datatypes.state import GameState
 from game.ui.map_renderer import render_map
-from init_game import fixed_capitals, random_capitals
+from game.init_game import fixed_capitals, random_capitals
 
 from ai.envs.action import ActionEncoder
 from ai.envs.observation import ObservationEncoder

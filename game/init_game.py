@@ -2,11 +2,11 @@
 
 扩展示例：
     # 固定首都开局
-    from init_game import fixed_capitals
+    from game.init_game import fixed_capitals
     state = fixed_capitals([5, 20])
 
     # 从存档恢复
-    from init_game import from_save
+    from game.init_game import from_save
     state = from_save("save.json")
 """
 

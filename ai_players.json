@@ -1,0 +1,5 @@
+{
+  "comment": "编辑此文件设置各玩家的模型路径，启动游戏时交互选择是否启用 AI",
+  "1": "saves/final.zip",
+  "2": "saves/model_p2.zip"
+}

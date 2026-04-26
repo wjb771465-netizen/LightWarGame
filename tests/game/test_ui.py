@@ -109,7 +109,7 @@ class TestMapRenderer(unittest.TestCase):
 
     def test_render_creates_file(self) -> None:
         from game.ui.map_renderer import render_map
-        from init_game import fixed_capitals
+        from game.init_game import fixed_capitals
         state = fixed_capitals([1, 2])
         with tempfile.TemporaryDirectory() as d:
             path = os.path.join(d, "test_map.png")

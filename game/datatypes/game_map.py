@@ -56,11 +56,12 @@ class Region:
 class GameMap:
     """版图：合法 id / 邻接校验、兵力增长、按指令更新地区。"""
 
-    __slots__ = ("regions", "_config_name")
+    __slots__ = ("regions", "_config_name", "capitals")
 
     def __init__(self, config_name: str = "cn") -> None:
         self._config_name = config_name
         self.regions = self._load_regions(parse_map_config(config_name))
+        self.capitals = []
 
     def assign_capitals(self, capitals: Sequence[int]) -> None:
         """按玩家顺序分配首都：capitals[p-1] 为玩家 p 的首都地区 id（1-based 地区编号）。"""
@@ -75,6 +76,7 @@ class GameMap:
             r.troops = 80
             r.is_capital = True
             r.base_growth = 8
+            self.capitals.append(capital_idx)
 
     def _load_regions(self, data: Dict[str, Any]) -> List[Optional[Region]]:
         spec = data["regions"]
