@@ -18,7 +18,17 @@ conda run -n chinese_war_game python main.py
 
 1. 选择新游戏或读取存档
 2. 新游戏：输入人数（2–6）→ 选随机首都或手动指定首都
-3. 回车开始
+3. 选择是否启用 AI 玩家及哪些玩家由 AI 控制
+
+### AI 对战
+
+编辑 `ai_players.json` 设置训练好的模型路径，启动时选择对应玩家为 AI 即可：
+
+```json
+{ "2": "saves/model.zip" }
+```
+
+AI 玩家回合自动推进，人类玩家回合正常输入指令。`obs_dim` 从模型权重自动推断，无需手动配置。
 
 ## 玩法
 
@@ -59,14 +69,19 @@ conda run -n chinese_war_game python -m unittest discover -s tests -p "test_*.py
 ```
 game/
 ├── datatypes/       # Region, GameMap, GameState, Command, Observation
-├── ui/              # 终端显示、指令输入、地图渲染
+├── ui/              # 终端显示、指令输入、地图渲染（含 AIGameUi）
+├── init_game.py     # 开局初始化（随机首都 / 指定首都 / 读档）
 ├── runner.py        # 主循环
 └── save_load.py     # 存读档
 
-ai/                  # 基于强化学习的人机玩家，待开发
+ai/
+├── algos/           # Policy 接口与 SB3Policy 包装
+├── envs/            # Gymnasium 环境封装、编解码、奖励函数、对手
+├── renders/         # 地图渲染与视频生成
+└── train/           # 训练脚本与配置
 
-init_game.py         # 开局初始化（随机首都 / 指定首都 / 读档）
-main.py              # 终端入口
+main.py              # 终端入口（GameLauncher）
+ai_players.json      # AI 玩家模型路径配置
 data/                # 地图数据
 tests/               # 单元测试
 ```

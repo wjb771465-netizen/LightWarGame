@@ -109,21 +109,33 @@ return Command(source=src_id, target=tgt_id, troops=troops, player=agent_id)
 
 ## 4. 奖励函数
 
-奖励为多个函数的加权叠加，由 YAML 配置驱动。
+奖励为多个函数的叠加，由 YAML 配置驱动。
 
-| 函数 | 触发时机 | 说明 |
-|------|------|------|
-| `WinLoseReward` | 终局 | 胜 `+win`，败 `+lose`，超时平局 `0` |
-| `TerritoryReward` | 每步 | `(己方地区变化 × territory_gain) + (敌方地区变化 × territory_loss)` |
-| `CapitalCaptureReward` | 每步 | 每占领一个敌方首都 `+capital_capture` |
+| 函数 | 基类 | 触发时机 | 说明 |
+|------|------|------|------|
+| `WinLoseReward` | `BaseRewardFunction` | 终局 | 胜 `+win`，败 `+lose`，超时平局 `0` |
+| `TerritoryReward` | `PotentialBasedReward` | 每步 | 势函数 `Φ(s) = territory_gain × 己方地区数 + territory_loss × 敌方地区数` |
+| `CapitalCaptureReward` | `PotentialBasedReward` | 每步 | 势函数 `Φ(s) = capital_capture × 己方首都数` |
+| `StepPenaltyReward` | `BaseRewardFunction` | 每步 | 固定惩罚 `step_penalty`，鼓励速胜 |
 
-默认配置（`vsbaseline.yaml`）：
+### 势函数奖励（Potential-Based Reward Shaping）
+
+`TerritoryReward` 和 `CapitalCaptureReward` 继承自 `PotentialBasedReward`，每步奖励为：
 
 ```
-win=100, lose=-100, territory_gain=5, territory_loss=-5, capital_capture=20
+F(s, s') = γ · Φ(s') − Φ(s)
 ```
 
-奖励函数在 `reset()` 时调用 `rf.reset()`，支持有状态的 shaping（如累计地区数）。
+其中 `γ=1.0`（默认），`Φ(s)` 为子类实现的势函数。差分形式保证在最优策略下奖励总和与 `Φ(s_terminal) − Φ(s_0)` 等价，不影响最优策略，只加速学习。
+
+**状态初始化**：`PotentialBasedReward.reset(initial_state, player_id)` 在每局开始时缓存 `Φ(s_0)`，使第一步奖励也正确反映变化量。
+
+### 默认配置（`vsbaseline.yaml`）
+
+```
+win=100, lose=-100
+territory_gain=1.0, territory_loss=-1.0, capital_capture=20.0, step_penalty=-0.2
+```
 
 ---
 
@@ -166,9 +178,10 @@ reward:
   win: 100.0
   lose: -100.0
   shaped:
-    territory_gain: 5.0
-    territory_loss: -5.0
+    territory_gain: 1.0
+    territory_loss: -1.0
     capital_capture: 20.0
+    step_penalty: -0.2
 
 training:
   mode: vsbaseline        # vsbaseline | self_play
