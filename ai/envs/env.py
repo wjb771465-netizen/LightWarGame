@@ -53,7 +53,7 @@ class LwgEnv(gym.Env):
         self._state = self._init_state()
         self._episode_steps = 0
         for rf in self.rewards:
-            rf.reset()
+            rf.reset(self._state, self.agent_id)
         if self.opponent is not None:
             self.opponent.reset()
         return self.obs_encoder.encode(self._state.get_observation(self.agent_id)), {}
