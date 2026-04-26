@@ -79,7 +79,10 @@ class LwgEnv(gym.Env):
         ))
 
         obs = self.obs_encoder.encode(self._state.get_observation(self.agent_id))
-        info = {}
+        info: dict = {}
+        if terminated or truncated:
+            winner = self._state.winner()
+            info["win"] = 1.0 if winner == self.agent_id else 0.0
 
         return obs, reward, terminated, truncated, info
 

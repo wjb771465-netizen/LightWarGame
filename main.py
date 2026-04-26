@@ -55,6 +55,7 @@ def main() -> None:
             state = fixed_capitals(_ask_capitals(num_players))
         else:
             state = random_capitals(num_players=num_players)
+        print("、".join(f"玩家{p + 1} 首都 → {c}" for p, c in enumerate(state.game_map.capitals)))
 
     GameRunner(state, TerminalGameUi(), save_path=SAVE_PATH, map_dir=MAP_DIR).run()
 

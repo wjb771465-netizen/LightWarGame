@@ -13,6 +13,7 @@ from stable_baselines3.common.logger import configure
 from stable_baselines3.common.vec_env import VecMonitor
 
 from ai.train.args import get_config
+from ai.train.metrics import WinRateCallback
 from ai.envs.env import LwgEnv
 
 
@@ -35,8 +36,8 @@ def train(args) -> None:
     tb_log_dir = os.path.join(save_dir, "tb")
 
     scenario = args.scenario
-    env = VecMonitor(make_vec_env(lambda: LwgEnv(scenario), n_envs=1))
-    eval_env = VecMonitor(make_vec_env(lambda: LwgEnv(scenario), n_envs=1))
+    env = VecMonitor(make_vec_env(lambda: LwgEnv(scenario), n_envs=1), info_keywords=("win",))
+    eval_env = VecMonitor(make_vec_env(lambda: LwgEnv(scenario), n_envs=1), info_keywords=("win",))
 
     model = MaskablePPO(
         "MlpPolicy",
@@ -63,6 +64,7 @@ def train(args) -> None:
             save_path=save_dir,
             name_prefix="lwg_ppo",
         ),
+        WinRateCallback(window=args.win_rate_window),
     ]
 
     if args.use_eval:

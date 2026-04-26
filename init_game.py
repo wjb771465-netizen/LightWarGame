@@ -28,7 +28,6 @@ def random_capitals(num_players: int = NUM_PLAYERS, map_config: str = MAP_CONFIG
     region_ids = [i for i in range(1, len(m.regions)) if m.valid_id(i)]
     capitals = random.sample(region_ids, num_players)
     m.assign_capitals(capitals)
-    print("、".join(f"玩家{p + 1} 首都 → {c}" for p, c in enumerate(capitals)))
     return GameState(m, num_players=num_players)
 
 

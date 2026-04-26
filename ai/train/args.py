@@ -146,6 +146,7 @@ def _get_log_config(parser: argparse.ArgumentParser) -> argparse.ArgumentParser:
                             （如 two_players/vsbaseline → "two_players"）
         --exp-name          W&B run 名称；不传则从 --scenario 内层名解析
                             （如 two_players/vsbaseline → "vsbaseline"）
+        --win-rate-window   胜率滑动窗口局数（default: 100）
     """
     group = parser.add_argument_group("Log parameters")
     group.add_argument("--wandb", action="store_true", default=False,
@@ -154,6 +155,8 @@ def _get_log_config(parser: argparse.ArgumentParser) -> argparse.ArgumentParser:
                        help="W&B 项目名；默认从 --scenario 外层目录解析")
     group.add_argument("--exp-name", type=str, default=None,
                        help="W&B run 名称；默认从 --scenario 内层名解析")
+    group.add_argument("--win-rate-window", type=int, default=100,
+                       help="胜率滑动窗口局数（default: 100）")
     return parser
 
 
