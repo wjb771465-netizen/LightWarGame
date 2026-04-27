@@ -20,7 +20,6 @@ from game.ui.terminal_ui import TerminalGameUi
 class GameLauncher:
     SAVES_DIR = "saves"
     SAVE_PATH = "saves/save.json"
-    MAP_DIR   = "saves"
     AI_CONFIG = "ai_players.json"
 
     def run(self) -> None:
@@ -28,7 +27,7 @@ class GameLauncher:
         state = self._setup_state()
         ai_ids = self._ask_ai_players(state.num_players)
         ui = self._build_ui(state, ai_ids)
-        GameRunner(state, ui, save_path=self.SAVE_PATH, map_dir=self.MAP_DIR).run()
+        GameRunner(state, ui, save_path=self.SAVE_PATH).run()
 
     # ------------------------------------------------------------------
     # 游戏状态初始化

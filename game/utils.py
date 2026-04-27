@@ -8,6 +8,11 @@ def get_project_root() -> Path:
     return Path(__file__).resolve().parent.parent
 
 
+def get_saves_dir() -> Path:
+    """存档根目录：<project_root>/saves。"""
+    return get_project_root() / "saves"
+
+
 def parse_map_config(config_name: str) -> Dict[str, Any]:
     """加载 data/map_configs/<config_name>.json（不含扩展名）。"""
     json_path = get_project_root() / "data" / "map_configs" / f"{config_name}.json"

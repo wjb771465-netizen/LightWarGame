@@ -1,25 +1,20 @@
 from __future__ import annotations
 
-import json
-import os
 from typing import List, Optional
 
 from game.datatypes.command import Command
-from game.datatypes.game_obs import observation_to_dict
 from game.datatypes.state import GameState
-from game.save_load import save_game
+from game.save_load import save_game, save_turn_map, save_turn_obs
 from game.ui_ports import GameUiPort
-from game.ui.map_renderer import render_map
 
 
 class GameRunner:
     """主循环：按 UI 约定展示 → 收集指令 → `check_cmds` → `apply_cmds` → `settle`，直至终局。"""
 
-    def __init__(self, state: GameState, ui: GameUiPort, save_path: Optional[str] = None, map_dir: Optional[str] = None) -> None:
+    def __init__(self, state: GameState, ui: GameUiPort, save_path: Optional[str] = None) -> None:
         self.state = state
         self.ui = ui
         self._save_path = save_path
-        self._map_dir = map_dir
 
     def run_single_turn(self) -> bool:
         """
@@ -31,22 +26,16 @@ class GameRunner:
         ui = self.ui
         ui.show_turn_start(state)
         #ui.show_state(state)
+        save_turn_map(state)
         commands: List[Command] = []
         for p in state.active_players:
             obs = state.get_observation(p)
             ui.show_observation(obs)
-            if self._map_dir:
-                obs_path = os.path.join(self._map_dir, f"obs_p{p}.json")
-                with open(obs_path, "w", encoding="utf-8") as f:
-                    json.dump(observation_to_dict(obs, state.game_map), f, ensure_ascii=False, indent=2)
+            save_turn_obs(obs, p, state)
             commands.extend(ui.collect_commands(state, p))
         valid_cmds = state.check_cmds(commands)
         state.apply_cmds(valid_cmds)
         ui.show_turn_results(state)
-        if self._map_dir:
-            path = os.path.join(self._map_dir, f"map_turn_{state.turn:03d}.png")
-            render_map(state, path)
-            print(f"[地图] 已保存 → {path}")
         return not state.settle()
 
     def run(self) -> None:
