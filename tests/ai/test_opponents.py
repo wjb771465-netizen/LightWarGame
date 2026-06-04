@@ -6,6 +6,7 @@ ai/envs/opponents/ 的单元测试。
 
 import unittest
 
+from game.constants import max_commands
 from game.datatypes.game_map import Region
 from game.datatypes.state import GameState
 from tests.helpers import map_with_regions
@@ -33,7 +34,7 @@ class TestRandomOpponent(unittest.TestCase):
         for _ in range(20):
             cmds = opp.act(state)
             owned = sum(1 for r in state.game_map.regions[1:] if r is not None and r.owner == 2)
-            self.assertLessEqual(len(cmds), max(1, owned // 3))
+            self.assertLessEqual(len(cmds), max_commands(owned))
 
     def test_commands_are_valid(self):
         state = self._linear_map()

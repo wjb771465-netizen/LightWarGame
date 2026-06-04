@@ -4,6 +4,7 @@ import math
 from collections import defaultdict
 from typing import Dict, List, Optional
 
+from game.constants import ISOLATION_PENALTY
 from game.datatypes.command import Command
 from game.datatypes.game_map import GameMap
 from game.datatypes.game_obs import Observation, build_observation
@@ -94,7 +95,7 @@ class GameState:
         for cmd in commands:
             t = cmd.troops
             if m.is_surrounded(cmd.source):
-                t = math.floor(t * 0.5)
+                t = math.floor(t * ISOLATION_PENALTY)
             incoming[cmd.target][cmd.player] += t
             m.regions[cmd.source].troops -= cmd.troops
 

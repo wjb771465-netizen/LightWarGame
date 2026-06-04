@@ -3,6 +3,7 @@ from __future__ import annotations
 import random
 from typing import List
 
+from game.constants import max_commands
 from game.datatypes.command import Command
 from game.datatypes.state import GameState
 from .base_opponent import BaseOpponent
@@ -15,7 +16,7 @@ class RandomOpponent(BaseOpponent):
         regions = state.game_map.regions
         player = self.player_id
         owned = sum(1 for r in regions[1:] if r is not None and r.owner == player)
-        max_cmds = max(1, owned // 3)
+        max_cmds = max_commands(owned)
 
         candidates: List[tuple] = []
         for rid, r in enumerate(regions[1:], 1):

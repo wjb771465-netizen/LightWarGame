@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from typing import List, Optional, Set
 
+from game.constants import max_commands
 from game.datatypes.command import Command
 from game.datatypes.state import GameState
 from .base_opponent import BaseOpponent
@@ -25,7 +26,7 @@ class RuleOpponent(BaseOpponent):
         regions = state.game_map.regions
         player = self.player_id
         owned = sum(1 for r in regions[1:] if r is not None and r.owner == player)
-        max_cmds = max(1, owned // 3)
+        max_cmds = max_commands(owned)
         attack_quota = (max_cmds + 1) // 2
         move_quota = max_cmds // 2
 

@@ -86,7 +86,7 @@ dim = len(edge_list) * 4 + 1
 `index k > 0` 合法的充要条件（三者同时满足）：
 
 1. **配额未耗尽**：`commands_issued < max_commands`
-   - `max_commands = max(1, owned_regions // 3)`
+   - `max_commands = max(1, ceil(owned_regions / 3))`，定义于 `game/constants.py`
    - 拥有地区数越多，每回合可发出指令越多
 2. **源地区归 agent 所有**：`r_obs.owner == viewer_id`
 3. **源地区有兵可动**：`r_obs.troops > 1`
@@ -148,7 +148,7 @@ territory_gain=1.0, territory_loss=-1.0, capital_capture=20.0, step_penalty=-0.2
 | `RandomOpponent` | 从合法动作中均匀随机采样 |
 | `RuleOpponent` | 基于规则：攻击配额优先打邻敌，调兵配额集中兵力到前线；攻击优先于调兵 |
 
-配额计算与 agent 相同：`max(1, owned // 3)`，攻击占 `ceil(quota/2)`，调兵占 `floor(quota/2)`。
+配额计算与 agent 相同：`max(1, ceil(owned / 3))`（定义于 `game/constants.py`），攻击占 `ceil(quota/2)`，调兵占 `floor(quota/2)`。
 
 ---
 

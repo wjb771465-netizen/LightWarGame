@@ -5,6 +5,7 @@ from typing import Any, List, Optional, Tuple
 import gymnasium as gym
 import numpy as np
 
+from game.constants import max_commands
 from game.datatypes.game_map import GameMap
 from game.datatypes.state import GameState
 from game.ui.map_renderer import render_map
@@ -93,8 +94,7 @@ class LwgEnv(gym.Env):
             1 for r in self._state.game_map.regions[1:]
             if r is not None and r.owner == self.agent_id
         )
-        max_commands = max(1, owned // 3)
-        return self.act_encoder.mask(obs, commands_issued=0, max_commands=max_commands)
+        return self.act_encoder.mask(obs, commands_issued=0, max_commands=max_commands(owned))
 
     def render(self, path: str) -> None:
         assert self._state is not None, "call reset() before render()"

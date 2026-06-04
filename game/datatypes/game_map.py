@@ -3,6 +3,7 @@ from __future__ import annotations
 import random
 from typing import Any, Dict, List, Optional, Sequence
 
+from game.constants import NEUTRAL_GROWTH
 from game.utils import parse_map_config
 
 
@@ -132,4 +133,4 @@ class GameMap:
             if r.owner >= 1:
                 r.troops += r.base_growth
             elif r.owner == 0:
-                r.troops += 1
+                r.troops += NEUTRAL_GROWTH

@@ -5,6 +5,7 @@ from __future__ import annotations
 import sys
 from typing import Callable, List, Optional, TextIO
 
+from game.constants import max_commands
 from game.datatypes.command import Command
 from game.datatypes.state import GameState
 
@@ -27,7 +28,7 @@ def collect_commands_for_player(
 ) -> List[Command]:
     """
     提示并循环读取 `源,目标,兵力`；空行或达到上限时结束。
-    上限 = max(1, 己方领地数 // 3)。校验基于 game_map 真值（非迷雾）。
+    上限 = max_commands(len(己方领地))，ceil 每 CMD_PER_TERRITORIES 地升级。校验基于 game_map 真值（非迷雾）。
     """
     inp = input_fn or input
     regions = state.game_map.regions
@@ -40,12 +41,12 @@ def collect_commands_for_player(
         print(f"玩家 {player_id} 没有领地，跳过指令输入")
         return []
 
-    max_commands = max(1, len(player_regions) // 3)
-    print(f"\n玩家 {player_id} 下达指令（格式: 源,目标,兵力；回车结束，上限 {max_commands} 条）")
+    max_cmd_count = max_commands(len(player_regions))
+    print(f"\n玩家 {player_id} 下达指令（格式: 源,目标,兵力；回车结束，上限 {max_cmd_count} 条）")
     commands: List[Command] = []
     while True:
-        if len(commands) >= max_commands:
-            print(f"已达上限 {max_commands} 条，自动结束")
+        if len(commands) >= max_cmd_count:
+            print(f"已达上限 {max_cmd_count} 条，自动结束")
             break
         line = inp("> ").strip()
         if not line:

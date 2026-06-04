@@ -24,7 +24,7 @@
 - AI 玩家模型路径配置在 `ai_players.json`，key 为 player_id（从 1 开始），value 为模型文件路径
 - `obs_dim` 从模型权重自动推断 `max_players`，训练后不可更改（改 max_players 需重新训练）
 - 每回合结算后自动存档至 `saves/save.json`
-- 指令配额 = `max(1, 领地数 // 3)`，空行或超出配额时自动结束该玩家本回合输入
+- 指令配额 = `max(1, ceil(领地数 / 3))`，定义于 `game/constants.py` 的 `max_commands()`，空行或超出配额时自动结束该玩家本回合输入
 - 只从己方地区向相邻地区派兵，出发地至少留 1 兵；孤立时途中兵力折半
 
 ## Test Conventions

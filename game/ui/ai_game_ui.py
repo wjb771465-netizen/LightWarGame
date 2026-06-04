@@ -8,6 +8,7 @@ from __future__ import annotations
 
 from typing import Any, List
 
+from game.constants import max_commands
 from game.datatypes.command import Command
 from game.datatypes.state import GameState
 from game.ui.terminal_ui import TerminalGameUi
@@ -42,7 +43,7 @@ class AIGameUi(TerminalGameUi):
             1 for r in state.game_map.regions[1:]
             if r is not None and r.owner == player_id
         )
-        mask = self._act_enc.mask(obs, commands_issued=0, max_commands=max(1, owned // 3))
+        mask = self._act_enc.mask(obs, commands_issued=0, max_commands=max_commands(owned))
         action = self._policies[player_id].predict(obs_arr, mask)
         cmd = self._act_enc.decode(action, player_id, state.game_map)
         return [cmd] if cmd is not None else []
