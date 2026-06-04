@@ -11,13 +11,13 @@ cd "$(dirname "$0")/../.."
 conda run --no-capture-output -n chinese_war_game env PYTHONUNBUFFERED=1 python -m ai.train.sb3_trainer \
   --scenario "$SCENARIO" \
   --exp-name "$EXP_NAME" \
-  --total-timesteps 1000000 \
-  --n-steps 2048 \
+  --total-timesteps 5000000 \
+  --n-steps 4096 \
   --batch-size 64 \
   --n-epochs 10 \
   --lr 3e-4 \
   --gamma 0.99 \
-  --gae-lambda 0.95 \
+  --gae-lambda 0.97 \
   --clip-range 0.2 \
   --net-arch 256 256 \
   --checkpoint-freq 100000 \

@@ -122,10 +122,10 @@ class GameLauncher:
         # 从模型 obs space 反推训练时的 max_players，避免维度不匹配
         num_regions = len(state.game_map.regions) - 1
         first_policy = next(iter(policies.values()))
-        max_players = first_policy.obs_dim // num_regions - 6
+        max_players = (first_policy.obs_dim - 2) // num_regions - 6
         obs_enc = ObservationEncoder(state.game_map, max_players)
         print("AI 玩家：" + "、".join(f"玩家{p} ({cfg[p]})" for p in ai_ids))
-        return AIGameUi(policies, obs_enc, act_enc)
+        return AIGameUi(policies, obs_enc, act_enc, log_path="saves/ai_decision.log")
 
 
 def main() -> None:

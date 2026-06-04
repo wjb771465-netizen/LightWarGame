@@ -36,8 +36,8 @@ def train(args) -> None:
     tb_log_dir = os.path.join(save_dir, "tb")
 
     scenario = args.scenario
-    env = VecMonitor(make_vec_env(lambda: LwgEnv(scenario), n_envs=1), info_keywords=("win",))
-    eval_env = VecMonitor(make_vec_env(lambda: LwgEnv(scenario), n_envs=1), info_keywords=("win",))
+    env = VecMonitor(make_vec_env(lambda: LwgEnv(scenario), n_envs=1), info_keywords=("win", "turn"))
+    eval_env = VecMonitor(make_vec_env(lambda: LwgEnv(scenario), n_envs=1), info_keywords=("win", "turn"))
 
     model = MaskablePPO(
         "MlpPolicy",

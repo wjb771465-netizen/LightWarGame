@@ -29,13 +29,20 @@ class ObservationEncoder:
         self._max_players = max_players
         self._num_regions = len(game_map.regions) - 1  # 1-indexed, skip index 0
         self._F = max_players + 6  # owner_onehot(max_players+1) + 5 scalars
-        self.dim = self._num_regions * self._F
+        self._G = 2   # global: commands_total, commands_used
+        self.dim = self._num_regions * self._F + self._G
+        self._CMD_MAX = 16  # 归一化上限（满图 ceil(31/3)=11，取16留余量）
 
     @property
     def space(self) -> gym.spaces.Box:
         return gym.spaces.Box(low=0.0, high=1.0, shape=(self.dim,), dtype=np.float32)
 
-    def encode(self, obs: Observation) -> np.ndarray:
+    def encode(
+        self,
+        obs: Observation,
+        commands_used: int = 0,
+        commands_total: int = 1,
+    ) -> np.ndarray:
         vec = np.zeros(self.dim, dtype=np.float32)
         game_map = self._game_map
         max_players = self._max_players
@@ -81,5 +88,9 @@ class ObservationEncoder:
             vec[base + o] = 1.0 if r_obs.troops is not None else 0.0
             o += 1
             vec[base + o] = 1.0 if r_obs.region_id in adj_to_mine else 0.0
+
+        # 全局特征（倒数两维）
+        vec[-2] = min(commands_total / self._CMD_MAX, 1.0)
+        vec[-1] = min(commands_used / self._CMD_MAX, 1.0)
 
         return vec

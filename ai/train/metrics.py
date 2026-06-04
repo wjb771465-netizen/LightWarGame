@@ -43,21 +43,28 @@ class EpisodeTracker:
 class WinRateCallback(BaseCallback):
     """SB3 适配层：从 episode info 提取数据喂给 EpisodeTracker，并写入 logger。
 
-    要求 VecMonitor 初始化时传入 info_keywords=("win",)，且 env.step() 在
-    episode 结束时返回 info["win"] = 1.0（胜）/ 0.0（负/平）。
+    要求 VecMonitor 初始化时传入 info_keywords=("win", "turn")，且 env.step() 在
+    episode 结束时返回 info["win"] 和 info["turn"]。
     """
 
     def __init__(self, window: int = 100) -> None:
         super().__init__()
         self._tracker = EpisodeTracker(window=window)
+        self._turn_sum: int = 0
+        self._turn_count: int = 0
 
     def _on_step(self) -> bool:
         for info in self.locals["infos"]:
             ep = info.get("episode")
-            if ep is not None and "win" in ep:
-                self._tracker.push(ep["win"])
-                if (v := self._tracker.win_rate_global) is not None:
-                    self.logger.record("rollout/win_rate_global", v)
-                if (v := self._tracker.win_rate_window) is not None:
-                    self.logger.record(f"rollout/win_rate_{self._tracker.window}", v)
+            if ep is not None:
+                if "win" in ep:
+                    self._tracker.push(ep["win"])
+                    if (v := self._tracker.win_rate_global) is not None:
+                        self.logger.record("rollout/win_rate_global", v)
+                    if (v := self._tracker.win_rate_window) is not None:
+                        self.logger.record(f"rollout/win_rate_{self._tracker.window}", v)
+                if "turn" in ep:
+                    self._turn_sum += int(ep["turn"])
+                    self._turn_count += 1
+                    self.logger.record("rollout/ep_turn_mean", self._turn_sum / self._turn_count)
         return True

@@ -46,6 +46,7 @@ class LwgEnv(gym.Env):
 
         self._state: Optional[GameState] = None
         self._episode_steps: int = 0
+        self._pending_cmds: List[Command] = []
 
     def reset(
         self, *, seed: Optional[int] = None, options: Optional[dict] = None
@@ -53,22 +54,43 @@ class LwgEnv(gym.Env):
         super().reset(seed=seed)
         self._state = self._init_state()
         self._episode_steps = 0
+        self._pending_cmds = []
         for rf in self.rewards:
             rf.reset(self._state, self.agent_id)
         if self.opponent is not None:
             self.opponent.reset()
-        return self.obs_encoder.encode(self._state.get_observation(self.agent_id)), {}
+        return self.obs_encoder.encode(
+            self._state.get_observation(self.agent_id),
+            commands_used=0,
+            commands_total=self._max_cmds(),
+        ), {}
 
     def step(self, action: int) -> Tuple[np.ndarray, float, bool, bool, dict]:
         assert self._state is not None, "call reset() before step()"
 
+        cmd = self.act_encoder.decode(action, player_id=self.agent_id, game_map=self._state.game_map)
+        max_cmds = self._max_cmds()
+
+        # 指令入队（未达配额且非 no-op）
+        if cmd is not None and len(self._pending_cmds) < max_cmds:
+            self._pending_cmds.append(cmd)
+            obs = self.obs_encoder.encode(
+                self._state.get_observation(self.agent_id),
+                commands_used=len(self._pending_cmds),
+                commands_total=max_cmds,
+            )
+            return obs, 0.0, False, False, {}
+
+        # === 回合结算 ===
         prev = StateSnapshot.from_state(self._state)
         self._episode_steps += 1
 
-        agent_cmd = self.act_encoder.decode(action, player_id=self.agent_id, game_map=self._state.game_map)
-        agent_cmds = [agent_cmd] if agent_cmd is not None else []
-        opp_cmds = self.opponent.act(self._state) if self.opponent is not None else []
+        agent_cmds = list(self._pending_cmds)
+        if cmd is not None:
+            agent_cmds.append(cmd)
+        self._pending_cmds = []
 
+        opp_cmds = self.opponent.act(self._state) if self.opponent is not None else []
         valid = self._state.check_cmds(agent_cmds + opp_cmds)
         self._state.apply_cmds(valid)
         terminated = self._state.settle()
@@ -79,22 +101,36 @@ class LwgEnv(gym.Env):
             for rf in self.rewards
         ))
 
-        obs = self.obs_encoder.encode(self._state.get_observation(self.agent_id))
+        obs = self.obs_encoder.encode(
+            self._state.get_observation(self.agent_id),
+            commands_used=0,
+            commands_total=self._max_cmds(),
+        )
         info: dict = {}
         if terminated or truncated:
             winner = self._state.winner()
             info["win"] = 1.0 if winner == self.agent_id else 0.0
+            info["turn"] = self._episode_steps
 
         return obs, reward, terminated, truncated, info
 
     def action_masks(self) -> np.ndarray:
         assert self._state is not None, "call reset() before action_masks()"
         obs = self._state.get_observation(self.agent_id)
+        return self.act_encoder.mask(
+            obs,
+            commands_issued=len(self._pending_cmds),
+            max_commands=self._max_cmds(),
+            pending_cmds=self._pending_cmds if self._pending_cmds else None,
+        )
+
+    def _max_cmds(self) -> int:
+        assert self._state is not None
         owned = sum(
             1 for r in self._state.game_map.regions[1:]
             if r is not None and r.owner == self.agent_id
         )
-        return self.act_encoder.mask(obs, commands_issued=0, max_commands=max_commands(owned))
+        return max_commands(owned)
 
     def render(self, path: str) -> None:
         assert self._state is not None, "call reset() before render()"

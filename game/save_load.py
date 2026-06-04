@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import webbrowser
 from typing import Any, Dict
 
 from game.datatypes.game_map import GameMap
@@ -43,6 +44,10 @@ def save_turn_map(state: GameState) -> None:
     path = d / f"map_turn_{state.turn:03d}.png"
     render_map(state, str(path))
     print(f"[地图] 已保存 → {path}")
+    try:
+        webbrowser.open(str(path))
+    except Exception:
+        pass  # 打开失败静默，不影响游戏流程
 
 
 def save_turn_obs(obs: Observation, player: int, state: GameState) -> None:

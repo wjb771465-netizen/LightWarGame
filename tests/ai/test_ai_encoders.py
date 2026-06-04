@@ -35,8 +35,8 @@ class TestObservationEncoder(unittest.TestCase):
         self.vec = self.enc.encode(self.obs)
 
     def test_dim_matches_formula(self):
-        # obs_dim = num_regions × (max_players + 6)
-        expected = 3 * (2 + 6)
+        # obs_dim = num_regions × (max_players + 6) + G（G=2: commands_total, commands_used）
+        expected = 3 * (2 + 6) + 2
         self.assertEqual(self.enc.dim, expected)
 
     def test_encoded_shape_matches_dim(self):

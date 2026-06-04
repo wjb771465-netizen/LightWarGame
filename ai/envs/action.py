@@ -40,6 +40,7 @@ class ActionEncoder:
         obs: Observation,
         commands_issued: int,
         max_commands: int,
+        pending_cmds: Optional[List[Command]] = None,
     ) -> np.ndarray:
         """
         计算合法动作的 bool 掩码，长度 = self.dim。
@@ -47,7 +48,8 @@ class ActionEncoder:
         index 0（no-op）始终合法。
         index k>0 合法条件：尚有配额 AND src 归 viewer AND src.troops > 1。
 
-        owner/troops 从 obs.regions 读取（当前回合实际状态），不依赖模板地图。
+        pending_cmds: 本回合已生成但未结算的指令。用于多步决策场景——
+        累加各源已承诺兵力，收缩 bucket 档位，避免透支。
         """
         result = np.zeros(self.dim, dtype=bool)
         result[0] = True
@@ -55,14 +57,35 @@ class ActionEncoder:
         if commands_issued >= max_commands:
             return result
 
+        # 计算各源已承诺兵力
+        committed: dict[int, int] = {}
+        if pending_cmds:
+            for cmd in pending_cmds:
+                committed[cmd.source] = committed.get(cmd.source, 0) + cmd.troops
+
         viewer_id = obs.viewer_id
         B = self._B
         for edge_idx, (src_id, _tgt_id) in enumerate(self._edges):
             r_obs = obs.regions[src_id]
             if r_obs is None or r_obs.owner != viewer_id or (r_obs.troops or 0) <= 1:
                 continue
+
+            available = (r_obs.troops or 0) - 1
+            used = committed.get(src_id, 0)
+            remaining = available - used
+
+            if remaining <= 0:
+                continue  # 该源已无兵可派
+
             base = 1 + edge_idx * B
-            result[base : base + B] = True
+            if used == 0:
+                # 无 pending 指令 → 所有 bucket 都合法
+                result[base : base + B] = True
+            else:
+                # 有 pending 指令 → 只保留不超过剩余兵力的 bucket
+                for b_idx, ratio in enumerate(_TROOP_BUCKETS):
+                    if max(1, math.floor(available * ratio)) <= remaining:
+                        result[base + b_idx] = True
 
         return result
 
