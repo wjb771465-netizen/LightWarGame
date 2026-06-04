@@ -11,9 +11,10 @@ from game.datatypes.state import GameState
 from game.ui.map_renderer import render_map
 from game.init_game import fixed_capitals, random_capitals
 
+from ai.algos.policy import SB3Policy
 from ai.envs.action import ActionEncoder
 from ai.envs.observation import ObservationEncoder
-from ai.envs.opponents import RandomOpponent, RuleOpponent
+from ai.envs.opponents import PolicyOpponent, RandomOpponent, RuleOpponent
 from ai.envs.opponents.base_opponent import BaseOpponent
 from ai.envs.rewards import build_reward_functions
 from ai.envs.rewards.reward_function_base import BaseRewardFunction
@@ -71,9 +72,11 @@ class LwgEnv(gym.Env):
         cmd = self.act_encoder.decode(action, player_id=self.agent_id, game_map=self._state.game_map)
         max_cmds = self._max_cmds()
 
-        # 指令入队（未达配额且非 no-op）
-        if cmd is not None and len(self._pending_cmds) < max_cmds:
+        if cmd is not None:
             self._pending_cmds.append(cmd)
+
+        # 未满额且非 no-op → 继续收集
+        if cmd is not None and len(self._pending_cmds) < max_cmds:
             obs = self.obs_encoder.encode(
                 self._state.get_observation(self.agent_id),
                 commands_used=len(self._pending_cmds),
@@ -86,8 +89,6 @@ class LwgEnv(gym.Env):
         self._episode_steps += 1
 
         agent_cmds = list(self._pending_cmds)
-        if cmd is not None:
-            agent_cmds.append(cmd)
         self._pending_cmds = []
 
         opp_cmds = self.opponent.act(self._state) if self.opponent is not None else []
@@ -142,6 +143,13 @@ class LwgEnv(gym.Env):
             return RandomOpponent(player_id=opponent_id)
         if opp_type == "rule":
             return RuleOpponent(player_id=opponent_id)
+        if opp_type == "policy":
+            return PolicyOpponent(
+                player_id=opponent_id,
+                policy=SB3Policy(self.config.training.policy_opponent_model),
+                obs_encoder=self.obs_encoder,
+                act_encoder=self.act_encoder,
+            )
         return None
 
     def _init_state(self) -> GameState:
