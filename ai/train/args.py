@@ -111,6 +111,8 @@ def _get_save_config(parser: argparse.ArgumentParser) -> argparse.ArgumentParser
     )
     group.add_argument("--checkpoint-freq", type=int, default=100_000,
                        help="每隔多少步保存一次 checkpoint（default: 100_000）")
+    group.add_argument("--resume-from", type=str, default=None,
+                       help="从 checkpoint(.zip) 恢复训练，num_timesteps 延续")
     return parser
 
 

@@ -65,7 +65,7 @@ def main() -> None:
     assert os.path.exists(mp + ".zip"), f"找不到模型：{mp}.zip，请先训练"
 
     out_dir = render_out_dir(args.scenario)
-    run_render(SB3Policy(mp), args.scenario, out_dir, args.episodes, args.fps)
+    run_render(SB3Policy(path=mp), args.scenario, out_dir, args.episodes, args.fps)
 
 
 if __name__ == "__main__":

@@ -1,19 +1,18 @@
 from __future__ import annotations
 
+import logging
 import os
 import random
 from datetime import datetime
 
 import numpy as np
 import torch
-from sb3_contrib import MaskablePPO
-from stable_baselines3.common.callbacks import CheckpointCallback, EvalCallback
 from stable_baselines3.common.env_util import make_vec_env
-from stable_baselines3.common.logger import configure
-from stable_baselines3.common.vec_env import VecMonitor
+from stable_baselines3.common.vec_env import VecEnv, VecMonitor
 
-from ai.train.metrics import WinRateCallback
+from ai.algos.policy import SB3Policy
 from ai.envs.env import LwgEnv
+from ai.train.metrics import WinRateCallback
 
 
 def _resolve_save_dir(args) -> str:
@@ -29,68 +28,69 @@ def _set_seeds(seed: int) -> None:
     torch.manual_seed(seed)
 
 
-def train(args) -> None:
-    save_dir = _resolve_save_dir(args)
-    os.makedirs(save_dir, exist_ok=True)
-    tb_log_dir = os.path.join(save_dir, "tb")
+class Sb3Trainer:
 
-    scenario = args.scenario
-    env = VecMonitor(make_vec_env(lambda: LwgEnv(scenario), n_envs=1), info_keywords=("win", "turn"))
-    eval_env = VecMonitor(make_vec_env(lambda: LwgEnv(scenario), n_envs=1), info_keywords=("win", "turn"))
+    def __init__(self, args) -> None:
+        self.args = args
+        self.save_dir = _resolve_save_dir(args)
+        os.makedirs(self.save_dir, exist_ok=True)
+        _set_seeds(args.seed)
 
-    model = MaskablePPO(
-        "MlpPolicy",
-        env,
-        policy_kwargs={"net_arch": args.net_arch},
-        n_steps=args.n_steps,
-        batch_size=args.batch_size,
-        n_epochs=args.n_epochs,
-        learning_rate=args.lr,
-        gamma=args.gamma,
-        gae_lambda=args.gae_lambda,
-        clip_range=args.clip_range,
-        verbose=1,
-        seed=args.seed,
-        tensorboard_log=tb_log_dir,
-    )
+    def train(self) -> None:
+        env   = self.create_env()
+        agent = self.create_agent(env)
+        self._win_cb = WinRateCallback(window=self.args.win_rate_window)
+        self._init_logging()
+        self.run(agent, env)
 
-    project = args.wandb_project or args.scenario.split("/")[0]
-    exp_name = args.exp_name or args.scenario.split("/")[-1]
-
-    callbacks = [
-        CheckpointCallback(
-            save_freq=args.checkpoint_freq,
-            save_path=save_dir,
-            name_prefix="lwg_ppo",
-        ),
-        WinRateCallback(window=args.win_rate_window),
-    ]
-
-    if args.use_eval:
-        callbacks.append(EvalCallback(
-            eval_env,
-            best_model_save_path=save_dir,
-            eval_freq=args.eval_freq,
-            n_eval_episodes=args.eval_episodes,
-            verbose=1,
-        ))
-
-    if args.wandb:
-        import wandb
-        from wandb.integration.sb3 import WandbCallback
-
-        wandb.init(
-            project=project,
-            name=exp_name,
-            config=vars(args),
-            dir=save_dir,
-            sync_tensorboard=True,
-            monitor_gym=True,
+    def create_env(self) -> VecEnv:
+        scenario = self.args.scenario
+        return VecMonitor(
+            make_vec_env(lambda: LwgEnv(scenario), n_envs=1),
+            info_keywords=("win", "turn"),
         )
-        callbacks.append(WandbCallback(verbose=2))
-    else:
-        model.set_logger(configure(folder=None, format_strings=["stdout"]))
 
-    model.learn(total_timesteps=args.total_timesteps, callback=callbacks)
-    model.save(os.path.join(save_dir, "final"))
-    print(f"模型已保存至 {save_dir}/final.zip")
+    def create_agent(self, env: VecEnv) -> SB3Policy:
+        resume = getattr(self.args, "resume_from", None)
+        if resume:
+            return SB3Policy(path=resume, env=env)
+        return SB3Policy(env=env, args=self.args, tb_log_dir=os.path.join(self.save_dir, "tb"))
+
+    def run(self, agent: SB3Policy, env: VecEnv) -> None:
+        total = self.args.total_timesteps
+        chunk = self.args.checkpoint_freq
+        while agent.num_timesteps < total:
+            agent.learn(min(chunk, total - agent.num_timesteps), callback=[self._win_cb])
+            step = agent.num_timesteps
+            agent.save(os.path.join(self.save_dir, f"ckpt_{step}"))
+            self.log_metrics(self._collect_metrics(), step)
+        agent.save(os.path.join(self.save_dir, "final"))
+        print(f"模型已保存至 {self.save_dir}/final.zip")
+
+    def log_metrics(self, metrics: dict, step: int) -> None:
+        if self.args.wandb:
+            import wandb
+            wandb.log({k: v for k, v in metrics.items() if v is not None}, step=step)
+        else:
+            logging.info("step=%d %s", step, metrics)
+
+    def _collect_metrics(self) -> dict:
+        t = self._win_cb._tracker
+        return {
+            "win_rate_global": t.win_rate_global,
+            "win_rate_window": t.win_rate_window,
+        }
+
+    def _init_logging(self) -> None:
+        if self.args.wandb:
+            import wandb
+            wandb.init(
+                project=self.args.wandb_project or self.args.scenario.split("/")[0],
+                name=self.args.exp_name or self.args.scenario.split("/")[-1],
+                config=vars(self.args),
+                dir=self.save_dir,
+                sync_tensorboard=True,
+                monitor_gym=True,
+            )
+        else:
+            logging.basicConfig(level=logging.INFO, format="%(message)s")

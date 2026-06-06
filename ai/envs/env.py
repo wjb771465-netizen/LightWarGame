@@ -150,7 +150,7 @@ class LwgEnv(gym.Env):
         if opp_type == "policy":
             return PolicyOpponent(
                 player_id=opponent_id,
-                policy=SB3Policy(self.config.training.policy_opponent_model),
+                policy=SB3Policy(path=self.config.training.policy_opponent_model),
                 obs_encoder=self.obs_encoder,
                 act_encoder=self.act_encoder,
             )

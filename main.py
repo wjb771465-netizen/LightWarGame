@@ -118,7 +118,7 @@ class GameLauncher:
         from ai.algos.policy import SB3Policy
         from game.ui.ai_game_ui import AIGameUi
         act_enc = ActionEncoder(state.game_map)
-        policies = {pid: SB3Policy(cfg[pid]) for pid in ai_ids}
+        policies = {pid: SB3Policy(path=cfg[pid]) for pid in ai_ids}
         # 从模型 obs space 反推训练时的 max_players，避免维度不匹配
         num_regions = len(state.game_map.regions) - 1
         first_policy = next(iter(policies.values()))
