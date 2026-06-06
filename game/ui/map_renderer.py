@@ -17,7 +17,12 @@ from game.datatypes.state import GameState
 
 _SUFFIXES = ["壮族自治区", "回族自治区", "维吾尔自治区", "自治区", "特别行政区", "市", "省"]
 
-_CJK_FONT = "/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc"
+_CJK_FONT_CANDIDATES = [
+    "/usr/share/fonts/opentype/noto/NotoSansCJK-Regular.ttc",  # Linux
+    "/System/Library/Fonts/PingFang.ttc",                       # macOS
+    "/System/Library/Fonts/STHeiti Light.ttc",                  # macOS fallback
+]
+_CJK_FONT = next((p for p in _CJK_FONT_CANDIDATES if Path(p).exists()), None)
 
 _COLORS = {
     0: "#cccccc",

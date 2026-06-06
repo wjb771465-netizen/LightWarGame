@@ -45,7 +45,7 @@ def save_turn_map(state: GameState) -> None:
     render_map(state, str(path))
     print(f"[地图] 已保存 → {path}")
     try:
-        webbrowser.open(str(path))
+        webbrowser.open(path.as_uri())
     except Exception:
         pass  # 打开失败静默，不影响游戏流程
 
