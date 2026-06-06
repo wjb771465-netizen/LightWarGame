@@ -24,6 +24,7 @@ def get_config() -> argparse.ArgumentParser:
     parser = _get_save_config(parser)
     parser = _get_eval_config(parser)
     parser = _get_log_config(parser)
+    parser = _get_self_play_config(parser)
     return parser
 
 
@@ -157,6 +158,29 @@ def _get_log_config(parser: argparse.ArgumentParser) -> argparse.ArgumentParser:
                        help="W&B run 名称；默认从 --scenario 内层名解析")
     group.add_argument("--win-rate-window", type=int, default=100,
                        help="胜率滑动窗口局数（default: 100）")
+    return parser
+
+
+# ---------------------------------------------------------------------------
+# Self-Play
+# ---------------------------------------------------------------------------
+
+def _get_self_play_config(parser: argparse.ArgumentParser) -> argparse.ArgumentParser:
+    """
+    Self-Play parameters:
+        --self-play                    启用自博弈训练（default: False）
+        --self-play-pool-size <int>    策略池最大容量（default: 10）
+        --self-play-initial-opponent <str>
+                                       冷启动对手类型：random | rule（default: random）
+    """
+    group = parser.add_argument_group("Self-Play parameters")
+    group.add_argument("--self-play", action="store_true", default=False,
+                       help="启用自博弈训练（default: False）")
+    group.add_argument("--self-play-pool-size", type=int, default=10,
+                       help="策略池最大容量（default: 10）")
+    group.add_argument("--self-play-initial-opponent", type=str, default="random",
+                       choices=["random", "rule"],
+                       help="冷启动对手类型：random | rule（default: random）")
     return parser
 
 

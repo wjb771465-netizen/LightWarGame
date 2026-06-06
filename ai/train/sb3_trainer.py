@@ -12,7 +12,6 @@ from stable_baselines3.common.env_util import make_vec_env
 from stable_baselines3.common.logger import configure
 from stable_baselines3.common.vec_env import VecMonitor
 
-from ai.train.args import get_config
 from ai.train.metrics import WinRateCallback
 from ai.envs.env import LwgEnv
 
@@ -95,14 +94,3 @@ def train(args) -> None:
     model.learn(total_timesteps=args.total_timesteps, callback=callbacks)
     model.save(os.path.join(save_dir, "final"))
     print(f"模型已保存至 {save_dir}/final.zip")
-
-
-def main() -> None:
-    parser = get_config()
-    args = parser.parse_args()
-    _set_seeds(args.seed)
-    train(args)
-
-
-if __name__ == "__main__":
-    main()

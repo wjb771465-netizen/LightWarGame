@@ -137,6 +137,10 @@ class LwgEnv(gym.Env):
         assert self._state is not None, "call reset() before render()"
         render_map(self._state, path)
 
+    def set_opponent(self, opponent: BaseOpponent | None) -> None:
+        """替换当前对手（自博弈训练中途换对手用）。"""
+        self.opponent = opponent
+
     def _build_opponent(self, opponent_id: int) -> Optional[BaseOpponent]:
         opp_type = getattr(self.config.training, "opponent", None)
         if opp_type == "random":
@@ -150,6 +154,8 @@ class LwgEnv(gym.Env):
                 obs_encoder=self.obs_encoder,
                 act_encoder=self.act_encoder,
             )
+        if opp_type == "pool":
+            return None  # 对手由训练编排层通过 set_opponent() 注入
         return None
 
     def _init_state(self) -> GameState:

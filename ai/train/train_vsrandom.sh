@@ -8,7 +8,7 @@ EXP_NAME="vsrandom_mlp256"
 
 cd "$(dirname "$0")/../.."
 
-conda run --no-capture-output -n chinese_war_game env PYTHONUNBUFFERED=1 python -m ai.train.sb3_trainer \
+conda run --no-capture-output -n chinese_war_game env PYTHONUNBUFFERED=1 python -m ai.train \
   --scenario "$SCENARIO" \
   --exp-name "$EXP_NAME" \
   --total-timesteps 5000000 \

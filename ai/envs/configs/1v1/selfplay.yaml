@@ -1,0 +1,20 @@
+game:
+  map_config: cn
+  num_players: 2
+  max_players: 6
+  max_turns: 150
+  capital_mode: fixed
+  capitals: [4, 20]        #河北(4) vs 江西(20)
+
+reward:
+  win: 100.0
+  lose: -100.0
+  shaped:
+    territory_gain: 1.0
+    territory_loss: -1.0
+    capital_capture: 20.0
+    step_penalty: -0.2
+
+training:
+  mode: self_play
+  opponent: pool           # 对手由训练编排层动态注入
