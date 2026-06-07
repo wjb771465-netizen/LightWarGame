@@ -7,31 +7,51 @@ from ai.envs.env import LwgEnv
 from ai.renders.utils import latest_model_dir, make_video, model_path, render_out_dir
 
 
-def _render_episode(policy: SB3Policy, scenario: str, ep: int, out_dir: str) -> tuple[int, int | None]:
+def _render_episode(policy: SB3Policy, scenario: str, ep: int, out_dir: str,
+                    max_turns: int | None = None,
+                    agent_capital: int | None = None,
+                    opponent_capital: int | None = None) -> tuple[int, int | None]:
     png_dir = os.path.join(out_dir, f"ep{ep:02d}", "png")
     os.makedirs(png_dir, exist_ok=True)
 
     env = LwgEnv(scenario)
+    if max_turns is not None:
+        env.config.game.max_turns = max_turns
+    if agent_capital is not None and opponent_capital is not None:
+        env.set_capitals(agent_capital, opponent_capital)
     obs, _ = env.reset()
-    step = 0
+
+    # 渲染初始状态（第 0 回合）
+    turn = 0
+    env.render(os.path.join(png_dir, f"turn_{turn:04d}.png"))
+    prev_episode_steps = env._episode_steps
+
     while True:
-        env.render(os.path.join(png_dir, f"turn_{step:04d}.png"))
         action = policy.predict(obs, env.action_masks())
         obs, _, terminated, truncated, _ = env.step(action)
-        step += 1
+
+        # 回合结算后或游戏结束时才渲染帧
+        if env._episode_steps > prev_episode_steps or terminated or truncated:
+            turn += 1
+            env.render(os.path.join(png_dir, f"turn_{turn:04d}.png"))
+            prev_episode_steps = env._episode_steps
+
         if terminated or truncated:
             break
 
-    env.render(os.path.join(png_dir, f"turn_{step:04d}_final.png"))
-    return step, env._state.winner(), env.agent_id
+    return turn, env._state.winner(), env.agent_id
 
 
 
-def run_render(policy: SB3Policy, scenario: str, out_dir: str, num_episodes: int, fps: int = 2) -> None:
+def run_render(policy: SB3Policy, scenario: str, out_dir: str, num_episodes: int, fps: int = 2,
+               max_turns: int | None = None,
+               agent_capital: int | None = None,
+               opponent_capital: int | None = None) -> None:
     os.makedirs(out_dir, exist_ok=True)
 
     for ep in range(num_episodes):
-        step, winner, agent_id = _render_episode(policy, scenario, ep, out_dir)
+        step, winner, agent_id = _render_episode(policy, scenario, ep, out_dir,
+                                                 max_turns, agent_capital, opponent_capital)
 
         png_dir = os.path.join(out_dir, f"ep{ep:02d}", "png")
         video_path = os.path.join(out_dir, f"ep{ep:02d}", f"ep{ep:02d}.mp4")
@@ -58,6 +78,12 @@ def main() -> None:
                         help="渲染局数（default: 1）")
     parser.add_argument("--fps", type=int, default=2,
                         help="视频帧率（default: 2）")
+    parser.add_argument("--max-turns", type=int, default=60,
+                        help="最大回合数（default: 60）")
+    parser.add_argument("--agent-capital", type=int, default=None,
+                        help="AI 首都省份 ID（覆盖场景配置）")
+    parser.add_argument("--opponent-capital", type=int, default=None,
+                        help="对手首都省份 ID（覆盖场景配置）")
     args = parser.parse_args()
 
     model_dir = args.model_dir or latest_model_dir(args.scenario)
@@ -65,7 +91,10 @@ def main() -> None:
     assert os.path.exists(mp + ".zip"), f"找不到模型：{mp}.zip，请先训练"
 
     out_dir = render_out_dir(args.scenario)
-    run_render(SB3Policy(path=mp), args.scenario, out_dir, args.episodes, args.fps)
+    run_render(SB3Policy(path=mp), args.scenario, out_dir, args.episodes, args.fps,
+               max_turns=args.max_turns,
+               agent_capital=args.agent_capital,
+               opponent_capital=args.opponent_capital)
 
 
 if __name__ == "__main__":
