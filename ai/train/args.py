@@ -25,6 +25,7 @@ def get_config() -> argparse.ArgumentParser:
     parser = _get_eval_config(parser)
     parser = _get_log_config(parser)
     parser = _get_self_play_config(parser)
+    parser = _get_region_self_play_config(parser)
     return parser
 
 
@@ -183,6 +184,27 @@ def _get_self_play_config(parser: argparse.ArgumentParser) -> argparse.ArgumentP
     group.add_argument("--self-play-initial-opponent", type=str, default="random",
                        choices=["random", "rule"],
                        help="冷启动对手类型：random | rule（default: random）")
+    return parser
+
+
+# ---------------------------------------------------------------------------
+# Region Self-Play
+# ---------------------------------------------------------------------------
+
+def _get_region_self_play_config(parser: argparse.ArgumentParser) -> argparse.ArgumentParser:
+    """
+    Region Self-Play parameters:
+        --region-self-play                     启用地区自博弈训练（default: False）
+        --region-self-play-regions <str>       逗号分隔的地区 ID，如 "4,20"；默认全 31 省
+        --region-pool-history <int>            每个地区保留的历史 checkpoint 数（default: 3）
+    """
+    group = parser.add_argument_group("Region Self-Play parameters")
+    group.add_argument("--region-self-play", action="store_true", default=False,
+                       help="启用地区自博弈训练（default: False）")
+    group.add_argument("--region-self-play-regions", type=str, default=None,
+                       help="逗号分隔的地区 ID，如 '4,20'；默认全 31 省")
+    group.add_argument("--region-pool-history", type=int, default=3,
+                       help="每个地区保留的历史 checkpoint 数（default: 3）")
     return parser
 
 

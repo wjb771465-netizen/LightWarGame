@@ -1,0 +1,20 @@
+game:
+  map_config: cn
+  num_players: 2
+  max_players: 6
+  max_turns: 150
+  capital_mode: fixed
+  capitals: [1, 2]        # 占位；训练器每个 chunk 前通过 set_capitals() 覆盖
+
+reward:
+  win: 100.0
+  lose: -100.0
+  shaped:
+    territory_gain: 1.0
+    territory_loss: -1.0
+    capital_capture: 20.0
+    step_penalty: -0.2
+
+training:
+  mode: region_self_play
+  opponent: pool           # 对手由 RegionSelfPlayTrainer 通过 set_opponent() 注入

@@ -7,7 +7,13 @@ from ai.train.self_play_trainer import SelfPlayTrainer
 
 def main() -> None:
     args = get_config().parse_args()
-    trainer = SelfPlayTrainer(args) if args.self_play else Sb3Trainer(args)
+    if args.region_self_play:
+        from ai.train.region_self_play_trainer import RegionSelfPlayTrainer
+        trainer = RegionSelfPlayTrainer(args)
+    elif args.self_play:
+        trainer = SelfPlayTrainer(args)
+    else:
+        trainer = Sb3Trainer(args)
     trainer.train()
 
 

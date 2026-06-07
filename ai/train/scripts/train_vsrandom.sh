@@ -6,7 +6,7 @@ set -euo pipefail
 SCENARIO="1v1/vsbaseline"
 EXP_NAME="vsrandom_mlp256"
 
-cd "$(dirname "$0")/../.."
+cd "$(dirname "$0")/../../.."
 
 conda run --no-capture-output -n chinese_war_game env PYTHONUNBUFFERED=1 python -m ai.train \
   --scenario "$SCENARIO" \

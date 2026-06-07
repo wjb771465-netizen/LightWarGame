@@ -9,15 +9,15 @@ from ai.envs.opponents.base_opponent import BaseOpponent
 from ai.train.sb3_trainer import Sb3Trainer
 
 
-def _make_warmup_opponent(opponent_type: str, player_id: int) -> BaseOpponent:
-    if opponent_type == "random":
-        return RandomOpponent(player_id=player_id)
-    if opponent_type == "rule":
-        return RuleOpponent(player_id=player_id)
-    raise ValueError(f"Unknown initial opponent type: {opponent_type!r}")
-
-
 class SelfPlayTrainer(Sb3Trainer):
+
+    @staticmethod
+    def _make_warmup_opponent(opponent_type: str, player_id: int) -> BaseOpponent:
+        if opponent_type == "random":
+            return RandomOpponent(player_id=player_id)
+        if opponent_type == "rule":
+            return RuleOpponent(player_id=player_id)
+        raise ValueError(f"Unknown initial opponent type: {opponent_type!r}")
 
     def run(self, agent: SB3Policy, env) -> None:
         agent_id: int = env.get_attr("agent_id")[0]
@@ -27,7 +27,7 @@ class SelfPlayTrainer(Sb3Trainer):
         act_enc = env.get_attr("act_encoder")[0]
 
         pool = OpponentPool(max_size=self.args.self_play_pool_size)
-        env.env_method("set_opponent", _make_warmup_opponent(self.args.self_play_initial_opponent, opponent_id))
+        env.env_method("set_opponent", self._make_warmup_opponent(self.args.self_play_initial_opponent, opponent_id))
         print(f"[SelfPlay] 冷启动对手: {self.args.self_play_initial_opponent}")
 
         total = self.args.total_timesteps

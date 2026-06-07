@@ -6,7 +6,7 @@ set -euo pipefail
 SCENARIO="1v1/vsrule"
 EXP_NAME="vsrule_mlp256"
 
-cd "$(dirname "$0")/../.."
+cd "$(dirname "$0")/../../.."
 
 conda run -n chinese_war_game python -m ai.train \
   --scenario "$SCENARIO" \

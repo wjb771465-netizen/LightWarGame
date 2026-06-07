@@ -141,6 +141,14 @@ class LwgEnv(gym.Env):
         """替换当前对手（自博弈训练中途换对手用）。"""
         self.opponent = opponent
 
+    def set_capitals(self, agent_cap: int, opponent_cap: int) -> None:
+        """覆盖下一局的首都配置（地区自博弈训练用）。"""
+        caps = [0, 0]
+        caps[self.agent_id - 1] = agent_cap
+        caps[2 - self.agent_id] = opponent_cap
+        self.config.game.capitals = caps
+        self.config.game.capital_mode = "fixed"
+
     def _build_opponent(self, opponent_id: int) -> Optional[BaseOpponent]:
         opp_type = getattr(self.config.training, "opponent", None)
         if opp_type == "random":
