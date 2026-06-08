@@ -26,7 +26,7 @@ class RegionSelfPlayTrainer(SelfPlayTrainer):
             list(range(1, 32)) if raw is None
             else [int(x.strip()) for x in raw.split(",")]
         )
-        self.pool = RegionPool(history=args.region_pool_history)
+        self.pool = RegionPool(history=args.self_play_pool_size)
         self._log_lock = threading.Lock()
         torch.set_num_threads(args.n_training_threads)
 
@@ -87,12 +87,19 @@ class RegionSelfPlayTrainer(SelfPlayTrainer):
 
         while agent.num_timesteps < total:
             # (1) Sample opponent — RegionPool handles its own locking
-            result = self.pool.sample_opponent(exclude_region=R)
+            result = self.pool.sample_opponent(
+                exclude_region=R,
+                strategy=self.args.pool_sampling_strategy,
+                lam=self.args.sampling_lam,
+                s=self.args.sampling_scale,
+                progress_D=self.args.progress_D,
+            )
 
             if result is None:
                 # 冷启动：池子还没有任何 checkpoint，用规则对手占位
                 opp_region = next(r for r in self.regions if r != R)
                 opp = self._make_warmup_opponent("rule", player_id=2)
+                opp_label = f"rule(region={opp_region})"
             else:
                 opp_region, entry = result
                 # Model load happens OUTSIDE the pool lock (expensive I/O)
@@ -102,10 +109,13 @@ class RegionSelfPlayTrainer(SelfPlayTrainer):
                     obs_encoder=env.get_attr("obs_encoder")[0],
                     act_encoder=env.get_attr("act_encoder")[0],
                 )
+                opp_label = f"policy(region={opp_region}, step={entry.step})"
 
             # (2) Configure environment with opponent and capitals
             env.env_method("set_opponent", opp)
             env.env_method("set_capitals", R, opp_region)
+            print(f"[RegionSP R={R}] chunk_start, agent_cap={R}, opp_cap={opp_region}, "
+                  f"opponent={opp_label}")
 
             # (3) Train one chunk
             steps = min(chunk, total - agent.num_timesteps)

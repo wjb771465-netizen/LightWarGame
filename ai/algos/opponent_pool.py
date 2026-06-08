@@ -1,11 +1,13 @@
-"""策略池：管理历史 checkpoint，支持多种淘汰模式。
+"""策略池：管理历史 checkpoint，支持多种淘汰模式与采样策略。
 
-池只管理 entry 索引，不负责构造 PolicyOpponent。
+池负责 entry 的增删查；采样方法提取 entry 字段后委托 ai.algos.sampling 的纯数学函数。
 """
 
 from __future__ import annotations
 
 from dataclasses import dataclass
+
+import numpy as np
 
 
 @dataclass
@@ -46,6 +48,58 @@ class OpponentPool:
         if 0 <= index < len(self._entries):
             return self._entries[index]
         return None
+
+    # ------------------------------------------------------------------
+    # 采样策略
+    # ------------------------------------------------------------------
+
+    def sample_uniform(self) -> PoolEntry | None:
+        """均匀随机采样。P(i) = 1/N（FSP）。"""
+        if not self._entries:
+            return None
+        from ai.algos.sampling import uniform_probs
+
+        probs = uniform_probs(len(self._entries))
+        idx = int(np.random.choice(len(self._entries), p=probs))
+        return self._entries[idx]
+
+    def sample_progress(
+        self, lam: float = 1.0, s: float = 100.0, D: float | None = None,
+    ) -> PoolEntry | None:
+        """进度优先：对 step 做 Logistic-Softmax，越新权重越高。
+
+        Args:
+            lam: 温度系数 λ
+            s: logistic 缩放因子
+            D: logistic 尺度，None 则自动取 (max_step - min_step) / 4，保底 1.0
+        """
+        if not self._entries:
+            return None
+        from ai.algos.sampling import logistic_softmax_probs
+
+        steps = np.array([e.step for e in self._entries], dtype=np.float64)
+        if D is None:
+            D = float(max(1.0, (steps.max() - steps.min()) / 4.0))
+        probs = logistic_softmax_probs(steps, lam=lam, s=s, D=D)
+        idx = int(np.random.choice(len(self._entries), p=probs))
+        return self._entries[idx]
+
+    def sample_elo(self, lam: float = 1.0, s: float = 100.0) -> PoolEntry | None:
+        """ELO 优先：对 elo 做 Logistic-Softmax（D=400）。
+        ELO 全为 None 时退化为 uniform。
+        """
+        if not self._entries:
+            return None
+        from ai.algos.sampling import logistic_softmax_probs, uniform_probs
+
+        has_elo = any(e.elo is not None for e in self._entries)
+        if not has_elo:
+            probs = uniform_probs(len(self._entries))
+        else:
+            elos = np.array([e.elo if e.elo is not None else 0.0 for e in self._entries], dtype=np.float64)
+            probs = logistic_softmax_probs(elos, lam=lam, s=s, D=400.0)
+        idx = int(np.random.choice(len(self._entries), p=probs))
+        return self._entries[idx]
 
     # ------------------------------------------------------------------
     def __len__(self) -> int:

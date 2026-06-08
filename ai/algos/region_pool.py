@@ -27,14 +27,35 @@ class RegionPool:
                 self._pools[region_id] = OpponentPool(max_size=self._history)
             self._pools[region_id].add(path, step)
 
-    def sample_opponent(self, exclude_region: int) -> tuple[int, PoolEntry] | None:
-        """随机抽一个地区（排除 exclude_region），返回该地区最新的 checkpoint。"""
+    def sample_opponent(
+        self,
+        exclude_region: int,
+        strategy: str = "latest",
+        lam: float = 1.0,
+        s: float = 100.0,
+        progress_D: float | None = None,
+    ) -> tuple[int, PoolEntry] | None:
+        """随机抽一个地区（排除 exclude_region），按 strategy 从该地区池中采样。
+
+        strategy: latest | uniform | progress | elo
+        """
         with self._lock:
             eligible = [rid for rid in self._pools if rid != exclude_region and len(self._pools[rid]) > 0]
             if not eligible:
                 return None
             rid = random.choice(eligible)
-            return rid, self._pools[rid].latest()
+            pool = self._pools[rid]
+            if strategy == "uniform":
+                entry = pool.sample_uniform()
+            elif strategy == "progress":
+                entry = pool.sample_progress(lam=lam, s=s, D=progress_D)
+            elif strategy == "elo":
+                entry = pool.sample_elo(lam=lam, s=s)
+            else:  # "latest"
+                entry = pool.latest()
+            if entry is None:
+                return None
+            return rid, entry
 
     def latest(self, region_id: int) -> PoolEntry | None:
         with self._lock:

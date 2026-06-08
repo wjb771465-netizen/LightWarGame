@@ -79,6 +79,33 @@ class TestRegionPoolSampleOpponent(unittest.TestCase):
             seen.add(rid)
         self.assertGreater(len(seen), 1)
 
+    def test_sample_strategy_uniform(self):
+        """strategy=uniform 时可能返回非最新 entry。"""
+        pool = RegionPool(history=3)
+        pool.add(2, "/tmp/r2_old.zip", 100)
+        pool.add(2, "/tmp/r2_new.zip", 500)
+        seen_steps = set()
+        for _ in range(100):
+            _, entry = pool.sample_opponent(exclude_region=1, strategy="uniform")
+            seen_steps.add(entry.step)
+        self.assertIn(100, seen_steps)
+
+    def test_sample_strategy_progress(self):
+        """strategy=progress 时不崩溃。"""
+        pool = RegionPool(history=3)
+        pool.add(2, "/tmp/r2.zip", 200)
+        rid, entry = pool.sample_opponent(exclude_region=1, strategy="progress")
+        self.assertEqual(rid, 2)
+        self.assertIsNotNone(entry)
+
+    def test_sample_strategy_elo_falls_back(self):
+        """strategy=elo 且 ELO=None 时不崩溃（退化 uniform）。"""
+        pool = RegionPool(history=3)
+        pool.add(2, "/tmp/r2.zip", 200)
+        rid, entry = pool.sample_opponent(exclude_region=1, strategy="elo")
+        self.assertEqual(rid, 2)
+        self.assertIsNotNone(entry)
+
 
 class TestRegionPoolSaveLoad(unittest.TestCase):
 

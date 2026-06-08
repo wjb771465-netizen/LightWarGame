@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
-# 地区自博弈训练（首跑：河北 vs 江西，验证可行性）
+# 地区自博弈训练 — FSP（虚构自博弈），uniform 均匀采样对手
 # 用法：bash ai/train/scripts/train_region_selfplay.sh [额外参数]
 set -euo pipefail
 
 SCENARIO="1v1/region_selfplay"
-EXP_NAME="region_selfplay_4_20"
+EXP_NAME="region_fsp_4_20"
 
 cd "$(dirname "$0")/../../.."
 
@@ -16,8 +16,9 @@ conda run --no-capture-output -n chinese_war_game \
   --exp-name               "$EXP_NAME" \
   --region-self-play \
   --region-self-play-regions 4,20 \
-  --region-pool-history    3 \
-  --total-timesteps        500000 \
+  --self-play-pool-size    20 \
+  --pool-sampling-strategy uniform \
+  --total-timesteps        1000000 \
   --n-steps                2048 \
   --batch-size             512 \
   --n-epochs               10 \
@@ -29,7 +30,7 @@ conda run --no-capture-output -n chinese_war_game \
   --checkpoint-freq        25000 \
   --win-rate-window        200 \
   --seed                   42 \
-  --parallel-regions       2 \
+  --parallel-regions       1 \
   --n-training-threads     4 \
   --wandb \
   "$@"

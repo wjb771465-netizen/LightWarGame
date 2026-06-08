@@ -43,7 +43,18 @@ class SelfPlayTrainer(Sb3Trainer):
             if evicted is not None:
                 print(f"[SelfPlay] 池满，淘汰: {evicted.path} (step={evicted.step})")
 
-            entry = pool.latest()
+            strategy = self.args.pool_sampling_strategy
+            lam = self.args.sampling_lam
+            scale = self.args.sampling_scale
+            if strategy == "uniform":
+                entry = pool.sample_uniform()
+            elif strategy == "progress":
+                entry = pool.sample_progress(lam=lam, s=scale, D=self.args.progress_D)
+            elif strategy == "elo":
+                entry = pool.sample_elo(lam=lam, s=scale)
+            else:  # "latest"
+                entry = pool.latest()
+
             if entry is not None:
                 env.env_method("set_opponent", PolicyOpponent(
                     player_id=opponent_id,
@@ -51,7 +62,7 @@ class SelfPlayTrainer(Sb3Trainer):
                     obs_encoder=obs_enc,
                     act_encoder=act_enc,
                 ))
-                print(f"[SelfPlay] step={step}, 切换对手: {entry.path}")
+                print(f"[SelfPlay] step={step}, strategy={strategy}, 对手: {entry.path} (step={entry.step})")
 
         agent.save(os.path.join(self.save_dir, "final"))
         print(f"模型已保存至 {self.save_dir}/final.zip")

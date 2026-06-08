@@ -102,6 +102,77 @@ class TestOpponentPoolQuery(unittest.TestCase):
         self.assertEqual(len(self.pool), 4)
 
 
+class TestOpponentPoolSampling(unittest.TestCase):
+    """采样方法：uniform / progress / elo。"""
+
+    def setUp(self):
+        self.pool = OpponentPool(max_size=10)
+        self.pool.add("/tmp/s100.zip", 100)
+        self.pool.add("/tmp/s300.zip", 300)
+        self.pool.add("/tmp/s200.zip", 200)
+
+    # -- uniform ----------------------------------------------------------
+
+    def test_uniform_returns_entry_from_pool(self):
+        e = self.pool.sample_uniform()
+        self.assertIsNotNone(e)
+        self.assertIn(e.path, {"/tmp/s100.zip", "/tmp/s200.zip", "/tmp/s300.zip"})
+
+    def test_uniform_empty_returns_none(self):
+        pool = OpponentPool(max_size=3)
+        self.assertIsNone(pool.sample_uniform())
+
+    # -- progress ---------------------------------------------------------
+
+    def test_progress_returns_entry_from_pool(self):
+        e = self.pool.sample_progress()
+        self.assertIsNotNone(e)
+        self.assertIn(e.path, {"/tmp/s100.zip", "/tmp/s200.zip", "/tmp/s300.zip"})
+
+    def test_progress_empty_returns_none(self):
+        pool = OpponentPool(max_size=3)
+        self.assertIsNone(pool.sample_progress())
+
+    def test_progress_higher_step_more_likely(self):
+        """高 step 的 entry 应更常被选中（统计检验）。"""
+        pool = OpponentPool(max_size=10)
+        pool.add("/tmp/low.zip", 100)
+        pool.add("/tmp/high.zip", 10000)
+        # 大量采样，高 step 的应有更多命中
+        counts = {"/tmp/low.zip": 0, "/tmp/high.zip": 0}
+        for _ in range(200):
+            e = pool.sample_progress(lam=1.0, s=100.0, D=1000.0)
+            counts[e.path] += 1
+        self.assertGreater(counts["/tmp/high.zip"], counts["/tmp/low.zip"])
+
+    # -- elo --------------------------------------------------------------
+
+    def test_elo_returns_entry_from_pool(self):
+        e = self.pool.sample_elo()
+        self.assertIsNotNone(e)
+        self.assertIn(e.path, {"/tmp/s100.zip", "/tmp/s200.zip", "/tmp/s300.zip"})
+
+    def test_elo_empty_returns_none(self):
+        pool = OpponentPool(max_size=3)
+        self.assertIsNone(pool.sample_elo())
+
+    def test_elo_all_none_falls_back_to_uniform(self):
+        """ELO 全为 None 时退化为 uniform（不崩溃）。"""
+        e = self.pool.sample_elo()
+        self.assertIsNotNone(e)
+
+    def test_elo_higher_elo_more_likely(self):
+        """高 ELO 的 entry 应更常被选中（统计检验）。"""
+        pool = OpponentPool(max_size=10)
+        pool.add("/tmp/weak.zip", 100, elo=800.0)
+        pool.add("/tmp/strong.zip", 200, elo=2000.0)
+        counts = {"/tmp/weak.zip": 0, "/tmp/strong.zip": 0}
+        for _ in range(200):
+            e = pool.sample_elo(lam=1.0, s=100.0)
+            counts[e.path] += 1
+        self.assertGreater(counts["/tmp/strong.zip"], counts["/tmp/weak.zip"])
+
+
 class TestOpponentPoolEdgeCases(unittest.TestCase):
 
     def test_max_size_one(self):

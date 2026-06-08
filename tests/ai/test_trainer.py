@@ -73,3 +73,41 @@ class TestMaskablePPOIntegration(unittest.TestCase):
 
             zips = [f for f in os.listdir(tmpdir) if f.endswith(".zip")]
             self.assertTrue(len(zips) > 0, f"没有找到 .zip 文件，tmpdir 内容：{os.listdir(tmpdir)}")
+
+
+class TestSelfPlayArgs(unittest.TestCase):
+    """验证新增的采样策略 CLI 参数解析。"""
+
+    def test_default_strategy_is_latest(self):
+        parser = get_config()
+        args = parser.parse_args(["--scenario", "1v1/selfplay", "--self-play"])
+        self.assertEqual(args.pool_sampling_strategy, "latest")
+
+    def test_strategy_choices(self):
+        parser = get_config()
+        for strategy in ("latest", "uniform", "progress", "elo"):
+            args = parser.parse_args([
+                "--scenario", "1v1/selfplay", "--self-play",
+                "--pool-sampling-strategy", strategy,
+            ])
+            self.assertEqual(args.pool_sampling_strategy, strategy)
+
+    def test_sampling_lam_default(self):
+        parser = get_config()
+        args = parser.parse_args(["--scenario", "1v1/selfplay", "--self-play"])
+        self.assertEqual(args.sampling_lam, 1.0)
+
+    def test_sampling_scale_default(self):
+        parser = get_config()
+        args = parser.parse_args(["--scenario", "1v1/selfplay", "--self-play"])
+        self.assertEqual(args.sampling_scale, 100.0)
+
+    def test_progress_D_default(self):
+        parser = get_config()
+        args = parser.parse_args(["--scenario", "1v1/selfplay", "--self-play"])
+        self.assertIsNone(args.progress_D)
+
+    def test_pool_size_default_is_20(self):
+        parser = get_config()
+        args = parser.parse_args(["--scenario", "1v1/selfplay", "--self-play"])
+        self.assertEqual(args.self_play_pool_size, 20)

@@ -152,6 +152,7 @@ class LwgEnv(gym.Env):
 
     def set_capitals(self, agent_cap: int, opponent_cap: int) -> None:
         """覆盖下一局的首都配置（地区自博弈训练用）。"""
+        # TODO: 硬编码 2，仅支持 num_players=2 时正确
         caps = [0, 0]
         caps[self.agent_id - 1] = agent_cap
         caps[2 - self.agent_id] = opponent_cap
