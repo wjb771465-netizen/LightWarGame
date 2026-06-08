@@ -15,6 +15,14 @@ reward:
     capital_capture: 20.0
     step_penalty: -0.2
 
+observation:
+  max_troops: 500
+  max_growth: 10
+  cmd_max: 16
+
+action:
+  troop_buckets: [0.25, 0.5, 0.75, 1.0]
+
 training:
   opponent: policy
   policy_opponent_model: "ai/train/results/1v1/vsbaseline/run_20260604_162348/lwg_ppo_500000_steps.zip"

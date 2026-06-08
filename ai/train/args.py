@@ -90,6 +90,8 @@ def _get_ppo_config(parser: argparse.ArgumentParser) -> argparse.ArgumentParser:
                        help="PPO clip 系数（default: 0.2）")
     group.add_argument("--net-arch", type=int, nargs="+", default=[256, 256],
                        help="MLP 隐层大小序列（default: 256 256）")
+    group.add_argument("--n-envs", type=int, default=4,
+                       help="训练 rollout 并行环境数（default: 4）")
     return parser
 
 

@@ -1,5 +1,5 @@
 {
   "comment": "编辑此文件设置各玩家的模型路径，启动游戏时交互选择是否启用 AI",
-  "1": "saves/final.zip",
-  "2": "saves/model_p2.zip"
+  "1": "ai/train/results/1v1/vsbaseline_fvr/run_20260606_101118/lwg_ppo_3000000_steps.zip",
+  "2": "ai/train/results/1v1/vspolicy/run_20260604_180146/lwg_ppo_2800000_steps.zip"
 }

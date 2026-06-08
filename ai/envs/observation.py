@@ -8,8 +8,10 @@ import numpy as np
 from game.datatypes.game_map import GameMap
 from game.datatypes.game_obs import Observation
 
+# 默认值，可通过 YAML encoder section 覆盖
 _MAX_TROOPS = 500
 _MAX_GROWTH = 10
+_CMD_MAX = 16
 
 
 class ObservationEncoder:
@@ -24,14 +26,19 @@ class ObservationEncoder:
       index 0 = neutral, index 1 = viewer 自己, index 2+ = 其他玩家（player_id 升序）
     """
 
-    def __init__(self, game_map: GameMap, max_players: int) -> None:
+    def __init__(self, game_map: GameMap, max_players: int,
+                 max_troops: int = _MAX_TROOPS,
+                 max_growth: int = _MAX_GROWTH,
+                 cmd_max: int = _CMD_MAX) -> None:
         self._game_map = game_map
         self._max_players = max_players
         self._num_regions = len(game_map.regions) - 1  # 1-indexed, skip index 0
         self._F = max_players + 6  # owner_onehot(max_players+1) + 5 scalars
         self._G = 2   # global: commands_total, commands_used
         self.dim = self._num_regions * self._F + self._G
-        self._CMD_MAX = 16  # 归一化上限（满图 ceil(31/3)=11，取16留余量）
+        self._max_troops = max_troops
+        self._max_growth = max_growth
+        self._cmd_max = cmd_max
 
     @property
     def space(self) -> gym.spaces.Box:
@@ -77,20 +84,20 @@ class ObservationEncoder:
 
             o = max_players + 1
             if r_obs.troops is not None:
-                vec[base + o] = min(r_obs.troops / _MAX_TROOPS, 1.0)
+                vec[base + o] = min(r_obs.troops / self._max_troops, 1.0)
             o += 1
             if r_obs.is_capital is not None:
                 vec[base + o] = float(r_obs.is_capital)
             o += 1
             if r_obs.base_growth is not None:
-                vec[base + o] = min(r_obs.base_growth / _MAX_GROWTH, 1.0)
+                vec[base + o] = min(r_obs.base_growth / self._max_growth, 1.0)
             o += 1
             vec[base + o] = 1.0 if r_obs.troops is not None else 0.0
             o += 1
             vec[base + o] = 1.0 if r_obs.region_id in adj_to_mine else 0.0
 
         # 全局特征（倒数两维）
-        vec[-2] = min(commands_total / self._CMD_MAX, 1.0)
-        vec[-1] = min(commands_used / self._CMD_MAX, 1.0)
+        vec[-2] = min(commands_total / self._cmd_max, 1.0)
+        vec[-1] = min(commands_used / self._cmd_max, 1.0)
 
         return vec

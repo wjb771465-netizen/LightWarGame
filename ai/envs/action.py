@@ -25,10 +25,12 @@ class ActionEncoder:
     bucket 为出兵比例档位，基数 = src.troops - 1。
     """
 
-    def __init__(self, game_map: GameMap) -> None:
+    def __init__(self, game_map: GameMap,
+                 troop_buckets: Tuple[float, ...] | None = None) -> None:
         self._game_map = game_map
         self._edges: List[Tuple[int, int]] = self._build_edge_list(game_map)
-        self._B = len(_TROOP_BUCKETS)
+        self._buckets = troop_buckets if troop_buckets is not None else _TROOP_BUCKETS
+        self._B = len(self._buckets)
         self.dim = len(self._edges) * self._B + 1  # +1 for no-op
 
     @property
@@ -83,7 +85,7 @@ class ActionEncoder:
                 result[base : base + B] = True
             else:
                 # 有 pending 指令 → 只保留不超过剩余兵力的 bucket
-                for b_idx, ratio in enumerate(_TROOP_BUCKETS):
+                for b_idx, ratio in enumerate(self._buckets):
                     if max(1, math.floor(available * ratio)) <= remaining:
                         result[base + b_idx] = True
 
@@ -103,7 +105,7 @@ class ActionEncoder:
         assert region is not None
 
         available = region.troops - 1
-        troops = max(1, math.floor(available * _TROOP_BUCKETS[bucket_idx]))
+        troops = max(1, math.floor(available * self._buckets[bucket_idx]))
         return Command(source=src_id, target=tgt_id, troops=troops, player=player_id)
 
     @staticmethod

@@ -36,9 +36,13 @@ class RegionSelfPlayTrainer(SelfPlayTrainer):
 
         for R in self.regions:
             os.makedirs(self._region_dir(R), exist_ok=True)
-            # TODO: 支持 --n-envs 传参；跨地区并行训练亦未实现
+            # 跨地区并行训练（TODO）：
+            #   目标 → 多个地区同时训练，每地区独立 env+model，共享 RegionPool。
+            #   方案 → ThreadPoolExecutor(max_workers=--parallel-regions)，
+            #   每 worker 跑一个 _train_region(R, pool_lock)，
+            #   只在 pool 操作时持锁，agent.learn() 不持锁（PyTorch 释放 GIL）。
             env = VecMonitor(
-                make_vec_env(lambda: LwgEnv(scenario), n_envs=8),
+                make_vec_env(lambda: LwgEnv(scenario), n_envs=self.args.n_envs, monitor_kwargs=None),
                 info_keywords=("win", "turn"),
             )
             envs[R] = env

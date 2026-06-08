@@ -15,6 +15,14 @@ reward:
     capital_capture: 20.0
     step_penalty: -0.2
 
+observation:
+  max_troops: 500
+  max_growth: 10
+  cmd_max: 16
+
+action:
+  troop_buckets: [0.25, 0.5, 0.75, 1.0]
+
 training:
   mode: region_self_play
   opponent: pool           # 对手由 RegionSelfPlayTrainer 通过 set_opponent() 注入
