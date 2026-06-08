@@ -6,7 +6,10 @@ EXP_NAME="vspolicy_500k"
 
 cd "$(dirname "$0")/../../.."
 
-conda run --no-capture-output -n chinese_war_game env PYTHONUNBUFFERED=1 python -m ai.train \
+CONDA_LIB="$(conda info --base)/envs/chinese_war_game/lib"
+conda run --no-capture-output -n chinese_war_game \
+  env LD_LIBRARY_PATH="$CONDA_LIB:${LD_LIBRARY_PATH:-}" PYTHONUNBUFFERED=1 \
+  python -m ai.train \
   --scenario "$SCENARIO" \
   --exp-name "$EXP_NAME" \
   --total-timesteps 5000000 \

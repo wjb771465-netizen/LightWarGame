@@ -8,7 +8,10 @@ EXP_NAME="region_selfplay_4_20"
 
 cd "$(dirname "$0")/../../.."
 
-conda run --no-capture-output -n chinese_war_game env PYTHONUNBUFFERED=1 python -m ai.train \
+CONDA_LIB="$(conda info --base)/envs/chinese_war_game/lib"
+conda run --no-capture-output -n chinese_war_game \
+  env LD_LIBRARY_PATH="$CONDA_LIB:${LD_LIBRARY_PATH:-}" PYTHONUNBUFFERED=1 \
+  python -m ai.train \
   --scenario               "$SCENARIO" \
   --exp-name               "$EXP_NAME" \
   --region-self-play \
@@ -26,5 +29,7 @@ conda run --no-capture-output -n chinese_war_game env PYTHONUNBUFFERED=1 python 
   --checkpoint-freq        25000 \
   --win-rate-window        200 \
   --seed                   42 \
+  --parallel-regions       2 \
+  --n-training-threads     4 \
   --wandb \
   "$@"

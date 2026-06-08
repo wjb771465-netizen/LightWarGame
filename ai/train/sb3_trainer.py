@@ -8,7 +8,7 @@ from datetime import datetime
 import numpy as np
 import torch
 from stable_baselines3.common.env_util import make_vec_env
-from stable_baselines3.common.vec_env import VecEnv, VecMonitor
+from stable_baselines3.common.vec_env import SubprocVecEnv, VecEnv, VecMonitor
 
 from ai.algos.policy import SB3Policy
 from ai.envs.env import LwgEnv
@@ -46,7 +46,7 @@ class Sb3Trainer:
     def create_env(self) -> VecEnv:
         scenario = self.args.scenario
         return VecMonitor(
-            make_vec_env(lambda: LwgEnv(scenario), n_envs=self.args.n_envs, monitor_kwargs=None),
+            make_vec_env(lambda: LwgEnv(scenario), n_envs=self.args.n_envs, vec_env_cls=SubprocVecEnv, monitor_kwargs=None),
             info_keywords=("win", "turn"),
         )
 

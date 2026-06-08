@@ -207,6 +207,10 @@ def _get_region_self_play_config(parser: argparse.ArgumentParser) -> argparse.Ar
                        help="逗号分隔的地区 ID，如 '4,20'；默认全 31 省")
     group.add_argument("--region-pool-history", type=int, default=3,
                        help="每个地区保留的历史 checkpoint 数（default: 3）")
+    group.add_argument("--parallel-regions", type=int, default=1,
+                       help="并行训练的地区数（default: 1=串行）。>1 时启用 ThreadPoolExecutor")
+    group.add_argument("--n-training-threads", type=int, default=1,
+                       help="PyTorch 内部线程数，限制每个地区模型的 CPU 并行度（default: 1）")
     return parser
 
 
