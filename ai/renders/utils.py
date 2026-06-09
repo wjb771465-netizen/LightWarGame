@@ -14,8 +14,25 @@ def latest_model_dir(scenario: str) -> str:
     return dirs[-1]
 
 
-def model_path(model_dir: str) -> str:
-    return os.path.join(model_dir, "final")
+def resolve_model_path(raw: str) -> str | tuple[str, str]:
+    """解析 --model-dir 值为模型路径（不含 .zip 后缀）。
+
+    - ``"DIR"`` → DIR/final
+    - ``"path/to/ckpt"`` → path/to/ckpt
+    - ``"a,b"`` → (a, b)  用于自博弈双 ckpt
+    """
+    parts = [p.strip() for p in raw.split(",")]
+
+    def _resolve(p: str) -> str:
+        if os.path.exists(p + ".zip"):
+            return p
+        final = os.path.join(p, "final")
+        if os.path.exists(final + ".zip"):
+            return final
+        raise FileNotFoundError(f"找不到模型：{p}.zip 或 {p}/final.zip")
+
+    paths = [_resolve(p) for p in parts]
+    return tuple(paths) if len(paths) > 1 else paths[0]
 
 
 def render_out_dir(scenario: str) -> str:

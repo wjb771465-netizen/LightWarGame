@@ -4,13 +4,14 @@ import argparse
 import os
 from ai.algos.policy import SB3Policy
 from ai.envs.env import LwgEnv
-from ai.renders.utils import latest_model_dir, make_video, model_path, render_out_dir
+from ai.renders.utils import latest_model_dir, make_video, resolve_model_path, render_out_dir
 
 
 def _render_episode(policy: SB3Policy, scenario: str, ep: int, out_dir: str,
                     max_turns: int | None = None,
                     agent_capital: int | None = None,
-                    opponent_capital: int | None = None) -> tuple[int, int | None]:
+                    opponent_capital: int | None = None,
+                    opponent_policy: SB3Policy | None = None) -> tuple[int, int | None]:
     png_dir = os.path.join(out_dir, f"ep{ep:02d}", "png")
     os.makedirs(png_dir, exist_ok=True)
 
@@ -19,6 +20,12 @@ def _render_episode(policy: SB3Policy, scenario: str, ep: int, out_dir: str,
         env.config.game.max_turns = max_turns
     if agent_capital is not None and opponent_capital is not None:
         env.set_capitals(agent_capital, opponent_capital)
+    if opponent_policy is not None:
+        from ai.envs.opponents import PolicyOpponent
+        env.set_opponent(PolicyOpponent(
+            player_id=2, policy=opponent_policy,
+            obs_encoder=env.obs_encoder, act_encoder=env.act_encoder,
+        ))
     obs, _ = env.reset()
 
     # 渲染初始状态（第 0 回合）
@@ -46,12 +53,14 @@ def _render_episode(policy: SB3Policy, scenario: str, ep: int, out_dir: str,
 def run_render(policy: SB3Policy, scenario: str, out_dir: str, num_episodes: int, fps: int = 2,
                max_turns: int | None = None,
                agent_capital: int | None = None,
-               opponent_capital: int | None = None) -> None:
+               opponent_capital: int | None = None,
+               opponent_policy: SB3Policy | None = None) -> None:
     os.makedirs(out_dir, exist_ok=True)
 
     for ep in range(num_episodes):
         step, winner, agent_id = _render_episode(policy, scenario, ep, out_dir,
-                                                 max_turns, agent_capital, opponent_capital)
+                                                 max_turns, agent_capital, opponent_capital,
+                                                 opponent_policy)
 
         png_dir = os.path.join(out_dir, f"ep{ep:02d}", "png")
         video_path = os.path.join(out_dir, f"ep{ep:02d}", f"ep{ep:02d}.mp4")
@@ -86,15 +95,23 @@ def main() -> None:
                         help="对手首都省份 ID（覆盖场景配置）")
     args = parser.parse_args()
 
-    model_dir = args.model_dir or latest_model_dir(args.scenario)
-    mp = model_path(model_dir)
-    assert os.path.exists(mp + ".zip"), f"找不到模型：{mp}.zip，请先训练"
+    raw = args.model_dir or latest_model_dir(args.scenario)
+    mp = resolve_model_path(raw)
+
+    if isinstance(mp, tuple):
+        agent_path, opp_path = mp
+    else:
+        agent_path, opp_path = mp, None
+
+    agent_policy = SB3Policy(path=agent_path)
+    opp_policy = SB3Policy(path=opp_path) if opp_path else None
 
     out_dir = render_out_dir(args.scenario)
-    run_render(SB3Policy(path=mp), args.scenario, out_dir, args.episodes, args.fps,
+    run_render(agent_policy, args.scenario, out_dir, args.episodes, args.fps,
                max_turns=args.max_turns,
                agent_capital=args.agent_capital,
-               opponent_capital=args.opponent_capital)
+               opponent_capital=args.opponent_capital,
+               opponent_policy=opp_policy)
 
 
 if __name__ == "__main__":

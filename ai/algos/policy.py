@@ -49,8 +49,8 @@ class SB3Policy:
             )
         self._first = path is None
 
-    def predict(self, obs: np.ndarray, mask: np.ndarray) -> int:
-        action, _ = self._model.predict(obs, action_masks=mask, deterministic=True)
+    def predict(self, obs: np.ndarray, mask: np.ndarray, deterministic: bool = True) -> int:
+        action, _ = self._model.predict(obs, action_masks=mask, deterministic=deterministic)
         return int(action)
 
     @property

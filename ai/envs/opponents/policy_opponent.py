@@ -48,7 +48,7 @@ class PolicyOpponent(BaseOpponent):
             obs_arr = self._obs_enc.encode(obs, commands_used=i, commands_total=total)
             mask = self._act_enc.mask(obs, commands_issued=i, max_commands=total,
                                       pending_cmds=commands if commands else None)
-            action = self._policy.predict(obs_arr, mask)
+            action = self._policy.predict(obs_arr, mask, deterministic=False)
             cmd = self._act_enc.decode(action, player_id=player, game_map=state.game_map)
             if cmd is None:
                 break

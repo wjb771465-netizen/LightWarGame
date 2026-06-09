@@ -30,7 +30,7 @@ class _MockPolicy:
         self.last_obs: np.ndarray | None = None
         self.call_count = 0
 
-    def predict(self, obs: np.ndarray, mask: np.ndarray) -> int:
+    def predict(self, obs: np.ndarray, mask: np.ndarray, deterministic: bool = True) -> int:
         self.last_obs = obs.copy()
         self.last_mask = mask.copy()
         self.call_count += 1
