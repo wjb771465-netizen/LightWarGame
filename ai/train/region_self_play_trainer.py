@@ -55,87 +55,92 @@ class RegionSelfPlayTrainer(SelfPlayTrainer):
             )
             win_cbs[R] = WinRateCallback(window=self.args.win_rate_window)
 
-        max_workers = min(self.args.parallel_regions, len(self.regions))
-        pending: set[int] = set(self.regions)
-        pending_lock = threading.Lock()
+        total = self.args.total_timesteps
+        chunk = self.args.checkpoint_freq
 
-        def worker() -> None:
-            while True:
-                with pending_lock:
-                    if not pending:
-                        return
-                    R = pending.pop()
-                self._train_region(R, envs[R], agents[R], win_cbs[R])
+        # Chunk-interleaved with pre-snapshot: each round samples all
+        # opponents BEFORE any region trains, so every region sees the
+        # same pool state (previous round's checkpoints).  Then all
+        # regions train one chunk and save.  This guarantees fair
+        # cross-region self-play after the first cold-start round.
+        while True:
+            active = [R for R in self.regions if agents[R].num_timesteps < total]
+            if not active:
+                break
 
-        with ThreadPoolExecutor(max_workers=max_workers) as executor:
-            futures = [executor.submit(worker) for _ in range(max_workers)]
-            for f in as_completed(futures):
-                f.result()  # propagate any exception from worker
+            # Phase 1: snapshot opponents — all regions sample from the
+            #          SAME pool state (previous round's checkpoints).
+            #          Store lightweight entries only; model loading is
+            #          deferred to Phase 2 to parallelize I/O across workers.
+            round_opponents: dict[int, tuple] = {}
+            for R in active:
+                result = self.pool.sample_opponent(
+                    exclude_region=R,
+                    strategy=self.args.pool_sampling_strategy,
+                    lam=self.args.sampling_lam,
+                    s=self.args.sampling_scale,
+                    progress_D=self.args.progress_D,
+                )
+                if result is None:
+                    opp_region = next(r for r in self.regions if r != R)
+                    round_opponents[R] = (None, opp_region,
+                                          f"rule(region={opp_region})")
+                else:
+                    opp_region, entry = result
+                    round_opponents[R] = (entry, opp_region,
+                                          f"policy(region={opp_region}, step={entry.step})")
+
+            # Phase 2: train all regions with their pre-sampled opponents,
+            #          parallelised via ThreadPoolExecutor.
+            def _train_chunk(R: int) -> None:
+                agent = agents[R]
+                env = envs[R]
+                win_cb = win_cbs[R]
+                entry_or_none, opp_region, opp_label = round_opponents[R]
+                steps = min(chunk, total - agent.num_timesteps)
+
+                # Build opponent inside the worker so that model-load I/O
+                # is parallelised across regions.
+                if entry_or_none is None:
+                    opp = self._make_warmup_opponent("rule", player_id=2)
+                else:
+                    opp = PolicyOpponent(
+                        player_id=2,
+                        policy=SB3Policy(path=entry_or_none.path),
+                        obs_encoder=env.get_attr("obs_encoder")[0],
+                        act_encoder=env.get_attr("act_encoder")[0],
+                    )
+
+                env.env_method("set_opponent", opp)
+                env.env_method("set_capitals", R, opp_region)
+                print(f"[RegionSP R={R}] round, agent_cap={R}, opp_cap={opp_region}, "
+                      f"opponent={opp_label}")
+
+                agent.learn(steps, callback=[win_cb])
+                step = agent.num_timesteps
+
+                ckpt = os.path.join(self._region_dir(R), f"ckpt_{step}")
+                agent.save(ckpt)
+                self.pool.add(R, ckpt + ".zip", step)
+
+                t = win_cb._tracker
+                self.log_metrics({
+                    f"region_{R}/win_rate_global": t.win_rate_global,
+                    f"region_{R}/win_rate_window": t.win_rate_window,
+                }, step)
+
+            max_workers = max(1, min(self.args.parallel_regions, len(active)))
+            with ThreadPoolExecutor(max_workers=max_workers) as executor:
+                fut_to_R = {executor.submit(_train_chunk, R): R for R in active}
+                for f in as_completed(fut_to_R):
+                    f.result()  # propagate first exception from any worker
+
+            # Persist pool state after each full round
+            self.pool.save(os.path.join(self.save_dir, "pool_state.json"))
 
         for R in self.regions:
             agents[R].save(os.path.join(self._region_dir(R), "final"))
         print(f"[RegionSelfPlay] 训练完成，模型保存至 {self.save_dir}")
-
-    # ------------------------------------------------------------------
-    # Core training logic
-    # ------------------------------------------------------------------
-
-    def _train_region(self, R: int, env, agent, win_cb) -> None:
-        """Train a single region to completion."""
-        total = self.args.total_timesteps
-        chunk = self.args.checkpoint_freq
-
-        while agent.num_timesteps < total:
-            # (1) Sample opponent — RegionPool handles its own locking
-            result = self.pool.sample_opponent(
-                exclude_region=R,
-                strategy=self.args.pool_sampling_strategy,
-                lam=self.args.sampling_lam,
-                s=self.args.sampling_scale,
-                progress_D=self.args.progress_D,
-            )
-
-            if result is None:
-                # 冷启动：池子还没有任何 checkpoint，用规则对手占位
-                opp_region = next(r for r in self.regions if r != R)
-                opp = self._make_warmup_opponent("rule", player_id=2)
-                opp_label = f"rule(region={opp_region})"
-            else:
-                opp_region, entry = result
-                # Model load happens OUTSIDE the pool lock (expensive I/O)
-                opp = PolicyOpponent(
-                    player_id=2,
-                    policy=SB3Policy(path=entry.path),
-                    obs_encoder=env.get_attr("obs_encoder")[0],
-                    act_encoder=env.get_attr("act_encoder")[0],
-                )
-                opp_label = f"policy(region={opp_region}, step={entry.step})"
-
-            # (2) Configure environment with opponent and capitals
-            env.env_method("set_opponent", opp)
-            env.env_method("set_capitals", R, opp_region)
-            print(f"[RegionSP R={R}] chunk_start, agent_cap={R}, opp_cap={opp_region}, "
-                  f"opponent={opp_label}")
-
-            # (3) Train one chunk
-            steps = min(chunk, total - agent.num_timesteps)
-            agent.learn(steps, callback=[win_cb])
-            step = agent.num_timesteps
-
-            # (4) Save checkpoint (unique path per region, no contention)
-            ckpt = os.path.join(self._region_dir(R), f"ckpt_{step}")
-            agent.save(ckpt)
-
-            # (5) Update shared pool (thread-safe internally)
-            self.pool.add(R, ckpt + ".zip", step)
-            self.pool.save(os.path.join(self.save_dir, "pool_state.json"))
-
-            # (6) Log metrics
-            t = win_cb._tracker
-            self.log_metrics({
-                f"region_{R}/win_rate_global": t.win_rate_global,
-                f"region_{R}/win_rate_window": t.win_rate_window,
-            }, step)
 
     # ------------------------------------------------------------------
     # Helpers

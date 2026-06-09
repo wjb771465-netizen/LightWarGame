@@ -16,8 +16,8 @@ conda run --no-capture-output -n chinese_war_game \
   --exp-name               "$EXP_NAME" \
   --region-self-play \
   --region-self-play-regions 4,20 \
-  --self-play-pool-size    20 \
-  --pool-sampling-strategy uniform \
+  --self-play-pool-size    100 \
+  --pool-sampling-strategy latest \
   --total-timesteps        1000000 \
   --n-steps                2048 \
   --batch-size             512 \
@@ -27,10 +27,10 @@ conda run --no-capture-output -n chinese_war_game \
   --gae-lambda             0.97 \
   --clip-range             0.2 \
   --net-arch               256 256 \
-  --checkpoint-freq        25000 \
+  --checkpoint-freq        8192 \
   --win-rate-window        200 \
   --seed                   42 \
-  --parallel-regions       1 \
+  --parallel-regions       2 \
   --n-training-threads     4 \
   --wandb \
   "$@"
