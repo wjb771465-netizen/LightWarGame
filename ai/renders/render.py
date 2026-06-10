@@ -22,10 +22,10 @@ def _render_episode(policy: SB3Policy, scenario: str, ep: int, out_dir: str,
         env.set_capitals(agent_capital, opponent_capital)
     if opponent_policy is not None:
         from ai.envs.opponents import PolicyOpponent
-        env.set_opponent(PolicyOpponent(
+        env.opponent = PolicyOpponent(
             player_id=2, policy=opponent_policy,
             obs_encoder=env.obs_encoder, act_encoder=env.act_encoder,
-        ))
+        )
     obs, _ = env.reset()
 
     # 渲染初始状态（第 0 回合）

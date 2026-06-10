@@ -11,7 +11,6 @@ from stable_baselines3.common.vec_env import SubprocVecEnv, VecMonitor
 from ai.algos.policy import SB3Policy
 from ai.algos.region_pool import RegionPool
 from ai.envs.env import LwgEnv
-from ai.envs.opponents import PolicyOpponent
 from ai.train.metrics import WinRateCallback
 from ai.train.self_play_trainer import SelfPlayTrainer
 
@@ -31,6 +30,34 @@ class RegionSelfPlayTrainer(SelfPlayTrainer):
         torch.set_num_threads(args.n_training_threads)
 
     # ------------------------------------------------------------------
+    # Opponent sampling (region-aware override)
+    # ------------------------------------------------------------------
+
+    def _sample_opponent_specs(self, pool, n_total: int, opponent_id: int,
+                               exclude_region: int) -> list[dict]:
+        """从 RegionPool 中有放回采样，spec 额外携带 opp_region。"""
+        strategy = self.args.pool_sampling_strategy
+        lam = self.args.sampling_lam
+        scale = self.args.sampling_scale
+
+        specs = []
+        for _ in range(n_total):
+            result = pool.sample_opponent(
+                exclude_region=exclude_region, strategy=strategy,
+                lam=lam, s=scale, progress_D=self.args.progress_D,
+            )
+            if result is not None:
+                rid, entry = result
+                specs.append({
+                    "type": "policy", "player_id": opponent_id,
+                    "path": entry.path.replace(".zip", ""),
+                    "opp_region": rid,
+                })
+            else:
+                specs.append({"type": "rule", "player_id": opponent_id})
+        return specs
+
+    # ------------------------------------------------------------------
     # Public entry point
     # ------------------------------------------------------------------
 
@@ -45,7 +72,8 @@ class RegionSelfPlayTrainer(SelfPlayTrainer):
         for R in self.regions:
             os.makedirs(self._region_dir(R), exist_ok=True)
             env = VecMonitor(
-                make_vec_env(lambda: LwgEnv(scenario), n_envs=self.args.n_envs, vec_env_cls=SubprocVecEnv, monitor_kwargs=None),
+                make_vec_env(lambda: LwgEnv(scenario), n_envs=self.args.n_envs,
+                             vec_env_cls=SubprocVecEnv, monitor_kwargs=None),
                 info_keywords=("win", "turn"),
             )
             envs[R] = env
@@ -55,66 +83,56 @@ class RegionSelfPlayTrainer(SelfPlayTrainer):
             )
             win_cbs[R] = WinRateCallback(window=self.args.win_rate_window)
 
+        n_opponents = self.args.n_opponents or self.args.n_envs
+        n_envs = self.args.n_envs
+        if n_envs % n_opponents != 0:
+            raise ValueError(
+                f"--n-envs ({n_envs}) 须为 --n-opponents ({n_opponents}) 的整数倍"
+            )
+        per_opponent = n_envs // n_opponents
+
         total = self.args.total_timesteps
         chunk = self.args.checkpoint_freq
 
-        # Chunk-interleaved with pre-snapshot: each round samples all
-        # opponents BEFORE any region trains, so every region sees the
-        # same pool state (previous round's checkpoints).  Then all
-        # regions train one chunk and save.  This guarantees fair
-        # cross-region self-play after the first cold-start round.
         while True:
             active = [R for R in self.regions if agents[R].num_timesteps < total]
             if not active:
                 break
 
-            # Phase 1: snapshot opponents — all regions sample from the
-            #          SAME pool state (previous round's checkpoints).
-            #          Store lightweight entries only; model loading is
-            #          deferred to Phase 2 to parallelize I/O across workers.
-            round_opponents: dict[int, tuple] = {}
+            # Phase 1: snapshot opponents from SAME pool state
+            round_specs: dict[int, list[dict]] = {}
             for R in active:
-                result = self.pool.sample_opponent(
-                    exclude_region=R,
-                    strategy=self.args.pool_sampling_strategy,
-                    lam=self.args.sampling_lam,
-                    s=self.args.sampling_scale,
-                    progress_D=self.args.progress_D,
-                )
-                if result is None:
-                    opp_region = next(r for r in self.regions if r != R)
-                    round_opponents[R] = (None, opp_region,
-                                          f"rule(region={opp_region})")
-                else:
-                    opp_region, entry = result
-                    round_opponents[R] = (entry, opp_region,
-                                          f"policy(region={opp_region}, step={entry.step})")
+                round_specs[R] = self._sample_opponent_specs(
+                    self.pool, n_opponents, opponent_id=2, exclude_region=R)
 
-            # Phase 2: train all regions with their pre-sampled opponents,
-            #          parallelised via ThreadPoolExecutor.
+            # Phase 2: train all regions, per-env opponent + capital
             def _train_chunk(R: int) -> None:
                 agent = agents[R]
                 env = envs[R]
                 win_cb = win_cbs[R]
-                entry_or_none, opp_region, opp_label = round_opponents[R]
+                specs = round_specs[R]
                 steps = min(chunk, total - agent.num_timesteps)
 
-                # Build opponent inside the worker so that model-load I/O
-                # is parallelised across regions.
-                if entry_or_none is None:
-                    opp = self._make_warmup_opponent("rule", player_id=2)
-                else:
-                    opp = PolicyOpponent(
-                        player_id=2,
-                        policy=SB3Policy(path=entry_or_none.path),
-                        obs_encoder=env.get_attr("obs_encoder")[0],
-                        act_encoder=env.get_attr("act_encoder")[0],
-                    )
-
-                env.env_method("set_opponent", opp)
-                env.env_method("set_capitals", R, opp_region)
-                print(f"[RegionSP R={R}] round, agent_cap={R}, opp_cap={opp_region}, "
-                      f"opponent={opp_label}")
+                opp_info = []
+                for i, spec in enumerate(specs):
+                    indices = list(range(i * per_opponent, (i + 1) * per_opponent))
+                    if not indices:
+                        continue
+                    env.env_method("set_opponent", spec, indices=indices)
+                    opp_region = spec.get("opp_region")
+                    if opp_region is None:
+                        opp_region = next(r for r in self.regions if r != R)
+                    env.env_method("set_capitals", R, opp_region, indices=indices)
+                    if spec["type"] == "policy":
+                        opp_info.append((opp_region, int(spec["path"].rsplit("ckpt_", 1)[-1])))
+                    else:
+                        opp_info.append((opp_region, spec["type"]))
+                info_str = ", ".join(f"R{r}->s{step}" if isinstance(step, int) else f"R{r}->{step}"
+                                     for r, step in opp_info[:8])
+                if len(opp_info) > 8:
+                    info_str += ", ..."
+                print(f"[RegionSP R={R}] agent={R}, opps=[{info_str}], "
+                      f"envs={n_envs}, per={per_opponent}")
 
                 agent.learn(steps, callback=[win_cb])
                 step = agent.num_timesteps
@@ -133,9 +151,8 @@ class RegionSelfPlayTrainer(SelfPlayTrainer):
             with ThreadPoolExecutor(max_workers=max_workers) as executor:
                 fut_to_R = {executor.submit(_train_chunk, R): R for R in active}
                 for f in as_completed(fut_to_R):
-                    f.result()  # propagate first exception from any worker
+                    f.result()
 
-            # Persist pool state after each full round
             self.pool.save(os.path.join(self.save_dir, "pool_state.json"))
 
         for R in self.regions:
@@ -147,7 +164,6 @@ class RegionSelfPlayTrainer(SelfPlayTrainer):
     # ------------------------------------------------------------------
 
     def log_metrics(self, metrics: dict, step: int) -> None:
-        """Thread-safe metrics logging."""
         if self.args.wandb:
             import wandb
             with self._log_lock:

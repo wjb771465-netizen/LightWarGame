@@ -146,9 +146,30 @@ class LwgEnv(gym.Env):
         assert self._state is not None, "call reset() before render()"
         render_map(self._state, path)
 
-    def set_opponent(self, opponent: BaseOpponent | None) -> None:
-        """替换当前对手（自博弈训练中途换对手用）。"""
-        self.opponent = opponent
+    def set_opponent(self, spec: dict | None) -> None:
+        """替换当前对手（自博弈训练中途换对手用）。
+
+        spec 为轻量对手描述，跨进程只传 dict，模型加载在 env 所在进程内完成：
+        - ``{"type": "random", "player_id": 2}``
+        - ``{"type": "rule",   "player_id": 2}``
+        - ``{"type": "policy", "player_id": 2, "path": "ai/train/.../ckpt_xxx"}``
+        - ``None``：清空对手
+        """
+        if spec is None:
+            self.opponent = None
+        elif spec["type"] == "random":
+            self.opponent = RandomOpponent(player_id=spec["player_id"])
+        elif spec["type"] == "rule":
+            self.opponent = RuleOpponent(player_id=spec["player_id"])
+        elif spec["type"] == "policy":
+            self.opponent = PolicyOpponent(
+                player_id=spec["player_id"],
+                policy=SB3Policy(path=spec["path"]),
+                obs_encoder=self.obs_encoder,
+                act_encoder=self.act_encoder,
+            )
+        else:
+            raise ValueError(f"Unknown opponent spec type: {spec['type']!r}")
 
     def set_capitals(self, agent_cap: int, opponent_cap: int) -> None:
         """覆盖下一局的首都配置（地区自博弈训练用）。"""
