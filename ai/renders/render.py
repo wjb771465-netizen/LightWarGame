@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import argparse
+import logging
 import os
 from ai.algos.policy import SB3Policy
 from ai.envs.env import LwgEnv
@@ -72,12 +73,13 @@ def run_render(policy: SB3Policy, scenario: str, out_dir: str, num_episodes: int
             else "opponent wins" if winner is not None
             else "draw (timeout)"
         )
-        print(f"ep {ep:02d} | {step} 回合 | {outcome} → {video_path}")
+        logging.info("ep %02d | %d 回合 | %s → %s", ep, step, outcome, video_path)
 
-    print(f"渲染结果已保存至 {out_dir}")
+    logging.info("渲染结果已保存至 %s", out_dir)
 
 
 def main() -> None:
+    logging.basicConfig(level=logging.INFO, format="%(message)s")
     parser = argparse.ArgumentParser(description="渲染已训练的 LightWarGame 智能体对局")
     parser.add_argument("--scenario", type=str, default="1v1/vsbaseline",
                         help="env 配置名，如 1v1/vsbaseline")

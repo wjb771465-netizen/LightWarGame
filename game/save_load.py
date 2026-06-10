@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 import json
+import logging
+import sys
 import webbrowser
 from typing import Any, Dict
 
@@ -43,11 +45,12 @@ def save_turn_map(state: GameState) -> None:
     d.mkdir(parents=True, exist_ok=True)
     path = d / f"map_turn_{state.turn:03d}.png"
     render_map(state, str(path))
-    print(f"[地图] 已保存 → {path}")
-    try:
-        webbrowser.open(path.as_uri())
-    except Exception:
-        pass  # 打开失败静默，不影响游戏流程
+    logging.info("[地图] 已保存 → %s", path)
+    if "unittest" not in sys.modules:
+        try:
+            webbrowser.open(path.as_uri())
+        except Exception:
+            pass  # 打开失败静默，不影响游戏流程
 
 
 def save_turn_obs(obs: Observation, player: int, state: GameState) -> None:

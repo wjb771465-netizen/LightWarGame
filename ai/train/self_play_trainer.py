@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 import os
 
 from ai.algos.opponent_pool import OpponentPool
@@ -63,7 +64,7 @@ class SelfPlayTrainer(Sb3Trainer):
 
         warmup_spec = {"type": self.args.self_play_initial_opponent, "player_id": opponent_id}
         env.env_method("set_opponent", warmup_spec)
-        print(f"[SelfPlay] 冷启动对手: {self.args.self_play_initial_opponent}")
+        logging.info("[SelfPlay] 冷启动对手: %s", self.args.self_play_initial_opponent)
 
         total = self.args.total_timesteps
         chunk = self.args.checkpoint_freq
@@ -76,7 +77,7 @@ class SelfPlayTrainer(Sb3Trainer):
 
             evicted = pool.add(ckpt + ".zip", step)
             if evicted is not None:
-                print(f"[SelfPlay] 池满，淘汰: {evicted.path} (step={evicted.step})")
+                logging.info("[SelfPlay] 池满，淘汰: %s (step=%d)", evicted.path, evicted.step)
 
             # 采样 n_opponents 种对手，每种发给 per_opponent 个 env
             specs = self._sample_opponent_specs(pool, n_opponents, opponent_id)
@@ -91,7 +92,8 @@ class SelfPlayTrainer(Sb3Trainer):
             steps_str = ", ".join(str(s) for s in steps[:8])
             if len(steps) > 8:
                 steps_str += ", ..."
-            print(f"[SelfPlay] step={step}, opponents=[{steps_str}], envs={n_envs}, per={per_opponent}")
+            logging.info("[SelfPlay] step=%d, opponents=[%s], envs=%d, per=%d",
+                         step, steps_str, n_envs, per_opponent)
 
         agent.save(os.path.join(self.save_dir, "final"))
-        print(f"模型已保存至 {self.save_dir}/final.zip")
+        logging.info("模型已保存至 %s/final.zip", self.save_dir)

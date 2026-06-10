@@ -32,6 +32,8 @@ class AIGameUi(TerminalGameUi):
         act_encoder: Any,
         log_path: Optional[str] = None,
     ) -> None:
+        import logging
+        logging.basicConfig(level=logging.INFO, format="%(message)s")
         super().__init__()
         self._policies = policies
         self._obs_enc = obs_encoder
@@ -55,8 +57,7 @@ class AIGameUi(TerminalGameUi):
                                       pending_cmds=cmds if cmds else None)
             action = self._policies[player_id].predict(obs_arr, mask)
             cmd = self._act_enc.decode(action, player_id, state.game_map)
-            if self._log_path is not None:
-                self._log_decision(state.turn, player_id, i + 1, total, cmd, state, mask)
+            self._log_decision(state.turn, player_id, i + 1, total, cmd, state, mask)
             if cmd is None:
                 break
             cmds.append(cmd)
@@ -64,19 +65,21 @@ class AIGameUi(TerminalGameUi):
 
     def _log_decision(self, turn: int, player_id: int, step: int, quota: int,
                       cmd: Optional[Command], state: GameState, mask) -> None:
+        import logging
+
         valid_n = int(mask.sum())
         if cmd is not None:
             src = state.game_map.regions[cmd.source]
             tgt = state.game_map.regions[cmd.target]
             src_name = src.name if src is not None else "?"
             tgt_name = tgt.name if tgt is not None else "?"
-            self._write(f"T{turn:03d} P{player_id} #{step}/{quota} "
-                       f"{src_name}→{tgt_name} {cmd.troops}兵 valid={valid_n}\n")
+            line = (f"T{turn:03d} P{player_id} #{step}/{quota} "
+                    f"{src_name}→{tgt_name} {cmd.troops}兵 valid={valid_n}")
         else:
-            self._write(f"T{turn:03d} P{player_id} #{step}/{quota} no-op valid={valid_n}\n")
+            line = f"T{turn:03d} P{player_id} #{step}/{quota} no-op valid={valid_n}"
 
-    def _write(self, line: str) -> None:
-        assert self._log_path is not None
-        self._log_path.parent.mkdir(parents=True, exist_ok=True)
-        with open(self._log_path, "a", encoding="utf-8") as f:
-            f.write(line)
+        logging.info(line)
+        if self._log_path is not None:
+            self._log_path.parent.mkdir(parents=True, exist_ok=True)
+            with open(self._log_path, "a", encoding="utf-8") as f:
+                f.write(line + "\n")

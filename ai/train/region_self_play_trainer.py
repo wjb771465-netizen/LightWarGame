@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 import os
 import threading
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -131,8 +132,8 @@ class RegionSelfPlayTrainer(SelfPlayTrainer):
                                      for r, step in opp_info[:8])
                 if len(opp_info) > 8:
                     info_str += ", ..."
-                print(f"[RegionSP R={R}] agent={R}, opps=[{info_str}], "
-                      f"envs={n_envs}, per={per_opponent}")
+                logging.info("[RegionSP R=%d] agent=%d, opps=[%s], envs=%d, per=%d",
+                             R, R, info_str, n_envs, per_opponent)
 
                 agent.learn(steps, callback=[win_cb])
                 step = agent.num_timesteps
@@ -157,7 +158,7 @@ class RegionSelfPlayTrainer(SelfPlayTrainer):
 
         for R in self.regions:
             agents[R].save(os.path.join(self._region_dir(R), "final"))
-        print(f"[RegionSelfPlay] 训练完成，模型保存至 {self.save_dir}")
+        logging.info("[RegionSelfPlay] 训练完成，模型保存至 %s", self.save_dir)
 
     # ------------------------------------------------------------------
     # Helpers
@@ -169,7 +170,6 @@ class RegionSelfPlayTrainer(SelfPlayTrainer):
             with self._log_lock:
                 wandb.log({k: v for k, v in metrics.items() if v is not None}, step=step)
         else:
-            import logging
             logging.info("step=%d %s", step, metrics)
 
     def _region_dir(self, R: int) -> str:

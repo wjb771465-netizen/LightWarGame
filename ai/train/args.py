@@ -237,4 +237,3 @@ def _get_region_self_play_config(parser: argparse.ArgumentParser) -> argparse.Ar
 if __name__ == "__main__":
     parser = get_config()
     all_args = parser.parse_args()
-    print(all_args)

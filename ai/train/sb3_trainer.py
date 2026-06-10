@@ -65,7 +65,7 @@ class Sb3Trainer:
             agent.save(os.path.join(self.save_dir, f"ckpt_{step}"))
             self.log_metrics(self._collect_metrics(), step)
         agent.save(os.path.join(self.save_dir, "final"))
-        print(f"模型已保存至 {self.save_dir}/final.zip")
+        logging.info("模型已保存至 %s/final.zip", self.save_dir)
 
     def log_metrics(self, metrics: dict, step: int) -> None:
         if self.args.wandb:
@@ -82,6 +82,7 @@ class Sb3Trainer:
         }
 
     def _init_logging(self) -> None:
+        logging.basicConfig(level=logging.INFO, format="%(message)s")
         if self.args.wandb:
             import wandb
             wandb.init(
@@ -92,5 +93,3 @@ class Sb3Trainer:
                 sync_tensorboard=True,
                 monitor_gym=True,
             )
-        else:
-            logging.basicConfig(level=logging.INFO, format="%(message)s")
