@@ -127,18 +127,31 @@ def _get_save_config(parser: argparse.ArgumentParser) -> argparse.ArgumentParser
 
 def _get_eval_config(parser: argparse.ArgumentParser) -> argparse.ArgumentParser:
     """
-    Eval parameters:
-        --use-eval                  开启训练过程中的周期评估（default: False）
-        --eval-freq <int>           每隔多少步做一次评估（default: 50_000）
-        --eval-episodes <int>       每次评估运行的局数（default: 100）
+    Eval parameters（与 checkpoint 同周期触发，并行模式与训练对齐）：
+        --use-eval                  开启评估（default: False）
+        --eval-n-envs <int>         并行评估进程数（default: 与 --n-envs 相同）
+        --eval-n-opponents <int>    评估对手种类数（default: 与 --n-opponents 或 --n-envs 相同）
+        --eval-episodes <int>       每个对手评估局数（default: 50）
+        --eval-opponent <str>       固定评估对手类型：random | rule（default: random）
+        --eval-opponent-path <str>  固定评估对手模型路径（优先级高于 --eval-opponent）
+        --eval-threshold <float>    最低胜率阈值，低于此不入池（default: 0.0=全入）
     """
     group = parser.add_argument_group("Eval parameters")
     group.add_argument("--use-eval", action="store_true", default=False,
-                       help="开启训练过程中的周期评估（default: False）")
-    group.add_argument("--eval-freq", type=int, default=50_000,
-                       help="每隔多少步做一次评估（default: 50_000）")
-    group.add_argument("--eval-episodes", type=int, default=100,
-                       help="每次评估运行的局数（default: 100）")
+                       help="开启评估（default: False）")
+    group.add_argument("--eval-n-envs", type=int, default=None,
+                       help="并行评估进程数（default: 与 --n-envs 相同）")
+    group.add_argument("--eval-n-opponents", type=int, default=None,
+                       help="评估对手种类数（default: 与 --n-opponents 或 --n-envs 相同）")
+    group.add_argument("--eval-episodes", type=int, default=50,
+                       help="每个对手评估局数（default: 50）")
+    group.add_argument("--eval-opponent", type=str, default="random",
+                       choices=["random", "rule"],
+                       help="固定评估对手类型：random | rule（default: random）")
+    group.add_argument("--eval-opponent-path", type=str, default=None,
+                       help="固定评估对手模型路径（优先级高于 --eval-opponent）")
+    group.add_argument("--eval-threshold", type=float, default=0.0,
+                       help="最低胜率阈值，低于此不入池（default: 0.0=全入）")
     return parser
 
 

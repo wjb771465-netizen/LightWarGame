@@ -62,10 +62,59 @@ class Sb3Trainer:
         while agent.num_timesteps < total:
             agent.learn(min(chunk, total - agent.num_timesteps), callback=[self._win_cb])
             step = agent.num_timesteps
-            agent.save(os.path.join(self.save_dir, f"ckpt_{step}"))
+            ckpt = os.path.join(self.save_dir, f"ckpt_{step}")
+            agent.save(ckpt)
+            if self.args.use_eval:
+                self.run_eval(ckpt, env, step)
             self.log_metrics(self._collect_metrics(), step)
         agent.save(os.path.join(self.save_dir, "final"))
         logging.info("模型已保存至 %s/final.zip", self.save_dir)
+
+    # ------------------------------------------------------------------
+    # Eval
+    # ------------------------------------------------------------------
+
+    def run_eval(self, ckpt: str, env, step: int) -> list:
+        """评估 agent vs 对手并记录指标。子类覆写 eval_opponent_specs 以接入 pool。"""
+        specs = self.eval_opponent_specs(env)
+        if not specs:
+            return []
+
+        from ai.train.eval import evaluate, aggregate_win_rate, aggregate_avg_turns
+
+        logging.info("[Eval] step=%d n_envs=%d episodes_per=%d",
+                     step, len(specs), self.args.eval_episodes)
+        results = evaluate(ckpt, specs, self.args.scenario, self.args.eval_episodes)
+
+        self.log_metrics({
+            "eval/win_rate": aggregate_win_rate(results),
+            "eval/avg_turns": aggregate_avg_turns(results),
+            "eval/episodes": sum(r.episodes for r in results),
+        }, step)
+        return results
+
+    def eval_opponent_specs(self, env) -> list[dict]:
+        """eval_n_envs 个固定对手 spec。SelfPlay/RegionSelfPlay 子类覆写以接入 pool。"""
+        eval_n_envs = self.args.eval_n_envs or self.args.n_envs
+        opponent_id = self._opponent_id(env)
+
+        if self.args.eval_opponent_path:
+            return eval_n_envs * [
+                {"type": "policy", "player_id": opponent_id,
+                 "path": self.args.eval_opponent_path},
+            ]
+        return eval_n_envs * [
+            {"type": self.args.eval_opponent, "player_id": opponent_id},
+        ]
+
+    def _opponent_id(self, env) -> int:
+        agent_id: int = env.get_attr("agent_id")[0]
+        num_players: int = env.get_attr("config")[0].game.num_players
+        return next(p for p in range(1, num_players + 1) if p != agent_id)
+
+    # ------------------------------------------------------------------
+    # Logging
+    # ------------------------------------------------------------------
 
     def log_metrics(self, metrics: dict, step: int) -> None:
         if self.args.wandb:

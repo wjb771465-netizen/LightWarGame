@@ -22,8 +22,8 @@ conda run --no-capture-output -n chinese_war_game \
   --clip-range 0.15 \
   --net-arch 256 256 \
   --checkpoint-freq 200000 \
-  --eval-freq 100000 \
-  --eval-episodes 100 \
+  --use-eval \
+  --eval-episodes 20 \
   --seed 42 \
   --wandb \
   "$@"
