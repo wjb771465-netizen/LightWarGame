@@ -21,11 +21,32 @@ class RegionPool:
         self._pools: dict[int, OpponentPool] = {}
         self._lock = threading.Lock()
 
-    def add(self, region_id: int, path: str, step: int) -> None:
+    def add(self, region_id: int, path: str, step: int,
+            elo: float | None = None,
+            outcomes: list | None = None,
+            ) -> tuple[PoolEntry | None, float, bool]:
+        """注册 checkpoint；outcomes 每个元素应有 .opponent_spec(dict, 含 opp_region)
+        / .wins / .draws / .episodes，内部解析对手 step+region、算分、_update_elo。"""
+        if outcomes is not None:
+            agent_elo = elo if elo is not None else 1200.0
+            prev_elo = agent_elo
+            for r in outcomes:
+                spec = r.opponent_spec
+                opp_region = spec.get("opp_region")
+                opp_step = OpponentPool._parse_step_from_spec(spec)
+                if opp_region is None or opp_step is None:
+                    continue
+                agent_elo, _ = self._update_elo(
+                    opp_region, opp_step, agent_elo, OpponentPool._compute_score(r))
+            if not OpponentPool._should_accept(prev_elo, agent_elo):
+                return None, agent_elo, False
+            elo = agent_elo
+            outcomes = None  # 已处理，不往下传
+
         with self._lock:
             if region_id not in self._pools:
                 self._pools[region_id] = OpponentPool(max_size=self._history)
-            self._pools[region_id].add(path, step)
+            return self._pools[region_id].add(path, step, elo=elo)
 
     def sample_opponent(
         self,
@@ -62,6 +83,16 @@ class RegionPool:
             pool = self._pools.get(region_id)
             return pool.latest() if pool is not None else None
 
+    def _update_elo(self, region_id: int, opponent_step: int,
+                   agent_elo: float, score: float, K: float = 32.0
+                   ) -> tuple[float, float]:
+        """更新指定地区池中某个对手的 ELO。"""
+        with self._lock:
+            pool = self._pools.get(region_id)
+            if pool is None:
+                return agent_elo, 1200.0
+            return pool._update_elo(opponent_step, agent_elo, score, K=K)
+
     def available_regions(self) -> list[int]:
         with self._lock:
             return sorted(rid for rid, pool in self._pools.items() if len(pool) > 0)
@@ -72,8 +103,8 @@ class RegionPool:
                 "history": self._history,
                 "regions": {
                     str(rid): [
-                        {"path": pool.sample(i).path, "step": pool.sample(i).step, "elo": pool.sample(i).elo}
-                        for i in range(len(pool))
+                        {"path": e.path, "step": e.step, "elo": e.elo}
+                        for e in pool
                     ]
                     for rid, pool in self._pools.items()
                 },
@@ -91,5 +122,5 @@ class RegionPool:
         for rid_str, entries in data["regions"].items():
             rid = int(rid_str)
             for entry in entries:
-                pool.add(rid, entry["path"], entry["step"])
+                pool.add(rid, entry["path"], entry["step"], elo=entry.get("elo"))
         return pool

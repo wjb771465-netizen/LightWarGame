@@ -92,6 +92,7 @@ class RegionSelfPlayTrainer(SelfPlayTrainer):
             )
         per_opponent = n_envs // n_opponents
 
+        agent_elos: dict[int, float] = {R: 1200.0 for R in self.regions}
         total = self.args.total_timesteps
         chunk = self.args.checkpoint_freq
 
@@ -140,7 +141,22 @@ class RegionSelfPlayTrainer(SelfPlayTrainer):
 
                 ckpt = os.path.join(self._region_dir(R), f"ckpt_{step}")
                 agent.save(ckpt)
-                self.pool.add(R, ckpt + ".zip", step)
+
+                ckpt_zip = ckpt + ".zip"
+                if self.args.use_eval:
+                    self._eval_region = R
+                    results = self.run_eval(ckpt, env, step)
+                    prev_elo = agent_elos[R]
+                    evicted, agent_elos[R], accepted = self.pool.add(
+                        R, ckpt_zip, step, elo=agent_elos[R], outcomes=results)
+                    if accepted:
+                        logging.info("[RegionSP R=%d] step=%d, ELO %.1f -> %.1f, 入池",
+                                     R, step, prev_elo, agent_elos[R])
+                    else:
+                        logging.info("[RegionSP R=%d] step=%d, ELO %.1f -> %.1f, 跳过入池",
+                                     R, step, prev_elo, agent_elos[R])
+                else:
+                    self.pool.add(R, ckpt_zip, step)
 
                 t = win_cb._tracker
                 self.log_metrics({
@@ -159,6 +175,30 @@ class RegionSelfPlayTrainer(SelfPlayTrainer):
         for R in self.regions:
             agents[R].save(os.path.join(self._region_dir(R), "final"))
         logging.info("[RegionSelfPlay] 训练完成，模型保存至 %s", self.save_dir)
+
+    # ------------------------------------------------------------------
+    # Eval opponents
+    # ------------------------------------------------------------------
+
+    def choose_eval_opponents(self, env) -> list[dict]:
+        """从 RegionPool 采样 eval 对手，覆写父类逻辑。"""
+        eval_n_envs = self.args.eval_n_envs or self.args.n_envs
+        eval_n_opponents = self.args.eval_n_opponents or self.args.n_opponents or self.args.n_envs
+        opponent_id = self._opponent_id(env)
+        R = getattr(self, "_eval_region", self.regions[0])
+
+        if not self.pool.available_regions():
+            return eval_n_envs * [
+                {"type": "rule", "player_id": opponent_id},
+            ]
+
+        per_opponent = max(1, eval_n_envs // eval_n_opponents)
+        specs = self._sample_opponent_specs(self.pool, eval_n_opponents, opponent_id,
+                                            exclude_region=R)
+        out = []
+        for spec in specs:
+            out.extend([spec] * per_opponent)
+        return out[:eval_n_envs]
 
     # ------------------------------------------------------------------
     # Helpers

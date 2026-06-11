@@ -134,7 +134,6 @@ def _get_eval_config(parser: argparse.ArgumentParser) -> argparse.ArgumentParser
         --eval-episodes <int>       每个对手评估局数（default: 50）
         --eval-opponent <str>       固定评估对手类型：random | rule（default: random）
         --eval-opponent-path <str>  固定评估对手模型路径（优先级高于 --eval-opponent）
-        --eval-threshold <float>    最低胜率阈值，低于此不入池（default: 0.0=全入）
     """
     group = parser.add_argument_group("Eval parameters")
     group.add_argument("--use-eval", action="store_true", default=False,
@@ -150,8 +149,6 @@ def _get_eval_config(parser: argparse.ArgumentParser) -> argparse.ArgumentParser
                        help="固定评估对手类型：random | rule（default: random）")
     group.add_argument("--eval-opponent-path", type=str, default=None,
                        help="固定评估对手模型路径（优先级高于 --eval-opponent）")
-    group.add_argument("--eval-threshold", type=float, default=0.0,
-                       help="最低胜率阈值，低于此不入池（default: 0.0=全入）")
     return parser
 
 

@@ -22,15 +22,16 @@ class TestOpponentPoolAdd(unittest.TestCase):
 
     def test_add_within_limit_no_eviction(self):
         pool = OpponentPool(max_size=3)
-        evicted = pool.add("/tmp/a.zip", 100)
+        evicted, _, accepted = pool.add("/tmp/a.zip", 100)
         self.assertIsNone(evicted)
+        self.assertTrue(accepted)
         self.assertEqual(len(pool), 1)
 
     def test_add_triggers_time_eviction(self):
         pool = OpponentPool(max_size=2, eviction_mode="time")
         pool.add("/tmp/old.zip", 100)
         pool.add("/tmp/mid.zip", 200)
-        evicted = pool.add("/tmp/new.zip", 300)
+        evicted, _, _ = pool.add("/tmp/new.zip", 300)
         self.assertIsNotNone(evicted)
         self.assertEqual(evicted.step, 100)  # step 最小 = 最旧
         self.assertEqual(evicted.path, "/tmp/old.zip")
@@ -40,7 +41,7 @@ class TestOpponentPoolAdd(unittest.TestCase):
         pool = OpponentPool(max_size=2, eviction_mode="elo")
         pool.add("/tmp/strong.zip", 100, elo=1600.0)
         pool.add("/tmp/weak.zip", 200, elo=1200.0)
-        evicted = pool.add("/tmp/mid.zip", 300, elo=1400.0)
+        evicted, _, _ = pool.add("/tmp/mid.zip", 300, elo=1400.0)
         self.assertIsNotNone(evicted)
         self.assertEqual(evicted.elo, 1200.0)  # elo 最小
         self.assertEqual(evicted.path, "/tmp/weak.zip")
@@ -49,7 +50,7 @@ class TestOpponentPoolAdd(unittest.TestCase):
         pool = OpponentPool(max_size=2, eviction_mode="elo")
         pool.add("/tmp/a.zip", 100, elo=500.0)
         pool.add("/tmp/b.zip", 200)  # elo=None → 0
-        evicted = pool.add("/tmp/c.zip", 300, elo=300.0)
+        evicted, _, _ = pool.add("/tmp/c.zip", 300, elo=300.0)
         self.assertEqual(evicted.path, "/tmp/b.zip")  # None→0 < 500
 
     def test_unknown_eviction_mode_raises(self):
@@ -59,7 +60,7 @@ class TestOpponentPoolAdd(unittest.TestCase):
     def test_evicted_is_returned_entry_not_in_pool(self):
         pool = OpponentPool(max_size=1, eviction_mode="time")
         pool.add("/tmp/first.zip", 100)
-        evicted = pool.add("/tmp/second.zip", 200)
+        evicted, _, _ = pool.add("/tmp/second.zip", 200)
         self.assertEqual(evicted.path, "/tmp/first.zip")
         self.assertNotIn("/tmp/first.zip", pool)
         self.assertIn("/tmp/second.zip", pool)
@@ -83,14 +84,13 @@ class TestOpponentPoolQuery(unittest.TestCase):
         pool = OpponentPool(max_size=3)
         self.assertIsNone(pool.latest())
 
-    def test_sample_valid_index(self):
-        e = self.pool.sample(0)
+    def test_get_by_step(self):
+        e = self.pool.get(100)
         self.assertIsNotNone(e)
         self.assertEqual(e.step, 100)
 
-    def test_sample_out_of_range(self):
-        self.assertIsNone(self.pool.sample(-1))
-        self.assertIsNone(self.pool.sample(99))
+    def test_get_missing_step(self):
+        self.assertIsNone(self.pool.get(999))
 
     def test_contains(self):
         self.assertIn("/tmp/s100.zip", self.pool)
@@ -177,18 +177,58 @@ class TestOpponentPoolEdgeCases(unittest.TestCase):
 
     def test_max_size_one(self):
         pool = OpponentPool(max_size=1)
-        self.assertIsNone(pool.add("/tmp/a.zip", 100))
-        evicted = pool.add("/tmp/b.zip", 200)
+        evicted, _, accepted = pool.add("/tmp/a.zip", 100)
+        self.assertIsNone(evicted)
+        self.assertTrue(accepted)
+        evicted, _, _ = pool.add("/tmp/b.zip", 200)
         self.assertEqual(evicted.path, "/tmp/a.zip")
         self.assertEqual(len(pool), 1)
 
     def test_all_same_step_time_mode_evicts_first(self):
-        """step 相同时 min() 返回第一个匹配项（稳定行为）。"""
+        """step 最小的被淘汰（time 模式）。"""
         pool = OpponentPool(max_size=2, eviction_mode="time")
         pool.add("/tmp/a.zip", 100)
-        pool.add("/tmp/b.zip", 100)
-        evicted = pool.add("/tmp/c.zip", 100)
+        pool.add("/tmp/b.zip", 200)
+        evicted, _, _ = pool.add("/tmp/c.zip", 300)
         self.assertEqual(evicted.path, "/tmp/a.zip")
+
+    def test_iter_yields_all_entries(self):
+        pool = OpponentPool(max_size=5)
+        pool.add("/tmp/a.zip", 100)
+        pool.add("/tmp/b.zip", 200)
+        self.assertEqual({e.path for e in pool}, {"/tmp/a.zip", "/tmp/b.zip"})
+
+
+class TestOpponentPoolElo(unittest.TestCase):
+
+    def test__update_elo_win(self):
+        """agent 赢了一场，双方 ELO 应正确更新。"""
+        pool = OpponentPool(max_size=3)
+        pool.add("/tmp/opp.zip", 100, elo=1200.0)
+
+        new_agent, new_opp = pool._update_elo(100, agent_elo=1200.0, score=1.0)
+        # 预期得分 = 0.5，agent 超出预期 0.5
+        self.assertAlmostEqual(new_agent, 1200.0 + 32.0 * 0.5, places=1)
+        self.assertAlmostEqual(new_opp, 1200.0 - 32.0 * 0.5, places=1)
+        # 对手池中 ELO 已更新
+        self.assertAlmostEqual(pool.get(100).elo, new_opp, places=1)
+
+    def test__update_elo_opponent_not_in_pool(self):
+        """对手不在池中时，默认 ELO=1200，不写回（不崩溃）。"""
+        pool = OpponentPool(max_size=3)
+        new_agent, new_opp = pool._update_elo(999, agent_elo=1400.0, score=1.0)
+        # agent 当前 1400, 对手默认 1200, 预期=0.76
+        expected = 1.0 / (1.0 + 10.0 ** ((1200.0 - 1400.0) / 400.0))
+        self.assertAlmostEqual(new_agent, 1400.0 + 32.0 * (1.0 - expected), places=1)
+
+    def test__update_elo_default_elo_when_none(self):
+        """对手 elo=None 时默认 1200。"""
+        pool = OpponentPool(max_size=3)
+        pool.add("/tmp/opp.zip", 100)  # elo=None
+
+        new_agent, new_opp = pool._update_elo(100, agent_elo=1200.0, score=0.0)
+        self.assertAlmostEqual(new_agent, 1200.0 - 16.0, places=1)
+        self.assertAlmostEqual(new_opp, 1200.0 + 16.0, places=1)
 
 
 if __name__ == "__main__":

@@ -75,8 +75,8 @@ class Sb3Trainer:
     # ------------------------------------------------------------------
 
     def run_eval(self, ckpt: str, env, step: int) -> list:
-        """评估 agent vs 对手并记录指标。子类覆写 eval_opponent_specs 以接入 pool。"""
-        specs = self.eval_opponent_specs(env)
+        """评估 agent vs 对手并记录指标。子类覆写 choose_eval_opponents 以接入 pool。"""
+        specs = self.choose_eval_opponents(env)
         if not specs:
             return []
 
@@ -93,7 +93,7 @@ class Sb3Trainer:
         }, step)
         return results
 
-    def eval_opponent_specs(self, env) -> list[dict]:
+    def choose_eval_opponents(self, env) -> list[dict]:
         """eval_n_envs 个固定对手 spec。SelfPlay/RegionSelfPlay 子类覆写以接入 pool。"""
         eval_n_envs = self.args.eval_n_envs or self.args.n_envs
         opponent_id = self._opponent_id(env)

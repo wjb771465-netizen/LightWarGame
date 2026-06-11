@@ -18,7 +18,6 @@
 from __future__ import annotations
 
 import logging
-import math
 import multiprocessing as mp
 from concurrent.futures import ProcessPoolExecutor
 from dataclasses import dataclass, field
@@ -108,15 +107,6 @@ def aggregate_avg_turns(results: list[EvalResult]) -> float | None:
     if not valid:
         return None
     return sum(r.avg_turns * r.episodes for r in valid) / sum(r.episodes for r in valid)
-
-
-def compute_elo(win_rate: float, baseline_elo: float = 1200.0) -> float:
-    r"""胜率 → ELO：baseline_elo + 400 * log10(win_rate / (1 - win_rate))"""
-    if win_rate <= 0.0:
-        return baseline_elo - 800.0
-    if win_rate >= 1.0:
-        return baseline_elo + 800.0
-    return baseline_elo + 400.0 * math.log10(win_rate / (1.0 - win_rate))
 
 
 # ---------------------------------------------------------------------------

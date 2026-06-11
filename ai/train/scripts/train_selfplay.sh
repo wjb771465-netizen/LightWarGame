@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
-# 自博弈训练
-# 用法：bash ai/train/train_selfplay.sh [额外参数]
+# 自博弈训练 — PFSP（优先虚构自博弈），progress 优先采样 + ELO 门控入池
+# 用法：bash ai/train/scripts/train_selfplay.sh [额外参数]
 set -euo pipefail
 
 SCENARIO="1v1/selfplay"
-EXP_NAME="selfplay_mlp256"
+EXP_NAME="pfsp_mlp256"
 
 cd "$(dirname "$0")/../../.."
 
@@ -17,6 +17,9 @@ conda run --no-capture-output -n chinese_war_game \
   --self-play \
   --self-play-pool-size 5 \
   --self-play-initial-opponent random \
+  --pool-sampling-strategy progress \
+  --use-eval \
+  --eval-episodes 20 \
   --total-timesteps 5000000 \
   --n-steps 4096 \
   --batch-size 64 \

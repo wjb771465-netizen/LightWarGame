@@ -60,12 +60,13 @@ class SelfPlayTrainer(Sb3Trainer):
             )
         per_opponent = n_envs // n_opponents  # 每个对手分给几个 env
 
-        pool = OpponentPool(max_size=self.args.self_play_pool_size)
+        self._pool = OpponentPool(max_size=self.args.self_play_pool_size)
 
         warmup_spec = {"type": self.args.self_play_initial_opponent, "player_id": opponent_id}
         env.env_method("set_opponent", warmup_spec)
         logging.info("[SelfPlay] 冷启动对手: %s", self.args.self_play_initial_opponent)
 
+        agent_elo = 1200.0
         total = self.args.total_timesteps
         chunk = self.args.checkpoint_freq
         while agent.num_timesteps < total:
@@ -73,14 +74,30 @@ class SelfPlayTrainer(Sb3Trainer):
             step = agent.num_timesteps
             ckpt = os.path.join(self.save_dir, f"ckpt_{step}")
             agent.save(ckpt)
+
+            ckpt_zip = ckpt + ".zip"
+            if self.args.use_eval:
+                results = self.run_eval(ckpt, env, step)
+                prev_elo = agent_elo
+                evicted, agent_elo, accepted = self._pool.add(
+                    ckpt_zip, step, elo=agent_elo, outcomes=results)
+                if accepted:
+                    if evicted is not None:
+                        logging.info("[SelfPlay] 池满，淘汰: %s (step=%d)", evicted.path, evicted.step)
+                    logging.info("[SelfPlay] step=%d, ELO %.1f -> %.1f, 入池",
+                                 step, prev_elo, agent_elo)
+                else:
+                    logging.info("[SelfPlay] step=%d, ELO %.1f -> %.1f, 跳过入池",
+                                 step, prev_elo, agent_elo)
+            else:
+                evicted, _, _ = self._pool.add(ckpt_zip, step)
+                if evicted is not None:
+                    logging.info("[SelfPlay] 池满，淘汰: %s (step=%d)", evicted.path, evicted.step)
+
             self.log_metrics(self._collect_metrics(), step)
 
-            evicted = pool.add(ckpt + ".zip", step)
-            if evicted is not None:
-                logging.info("[SelfPlay] 池满，淘汰: %s (step=%d)", evicted.path, evicted.step)
-
             # 采样 n_opponents 种对手，每种发给 per_opponent 个 env
-            specs = self._sample_opponent_specs(pool, n_opponents, opponent_id)
+            specs = self._sample_opponent_specs(self._pool, n_opponents, opponent_id)
             steps = []
             for i, spec in enumerate(specs):
                 indices = list(range(i * per_opponent, (i + 1) * per_opponent))
@@ -97,3 +114,25 @@ class SelfPlayTrainer(Sb3Trainer):
 
         agent.save(os.path.join(self.save_dir, "final"))
         logging.info("模型已保存至 %s/final.zip", self.save_dir)
+
+    # ------------------------------------------------------------------
+    # Eval opponents
+    # ------------------------------------------------------------------
+
+    def choose_eval_opponents(self, env) -> list[dict]:
+        """从 OpponentPool 采样 eval 对手，覆写父类固定对手逻辑。"""
+        eval_n_envs = self.args.eval_n_envs or self.args.n_envs
+        eval_n_opponents = self.args.eval_n_opponents or self.args.n_opponents or self.args.n_envs
+        opponent_id = self._opponent_id(env)
+
+        if len(self._pool) == 0:
+            return eval_n_envs * [
+                {"type": self.args.self_play_initial_opponent, "player_id": opponent_id},
+            ]
+
+        per_opponent = max(1, eval_n_envs // eval_n_opponents)
+        specs = self._sample_opponent_specs(self._pool, eval_n_opponents, opponent_id)
+        out = []
+        for spec in specs:
+            out.extend([spec] * per_opponent)
+        return out[:eval_n_envs]
