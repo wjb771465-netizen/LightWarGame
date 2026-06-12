@@ -61,12 +61,12 @@ class Sb3Trainer:
         chunk = self.args.checkpoint_freq
         while agent.num_timesteps < total:
             agent.learn(min(chunk, total - agent.num_timesteps), callback=[self._win_cb])
+            agent._model._custom_logger = True  # 复用 SummaryWriter，避免多 tfevents 文件
             step = agent.num_timesteps
             ckpt = os.path.join(self.save_dir, f"ckpt_{step}")
             agent.save(ckpt)
             if self.args.use_eval:
                 self.run_eval(ckpt, env, step)
-            self.log_metrics(self._collect_metrics(), step)
         agent.save(os.path.join(self.save_dir, "final"))
         logging.info("模型已保存至 %s/final.zip", self.save_dir)
 
@@ -86,10 +86,10 @@ class Sb3Trainer:
                      step, len(specs), self.args.eval_episodes)
         results = evaluate(ckpt, specs, self.args.scenario, self.args.eval_episodes)
 
-        self.log_metrics({
-            "eval/win_rate": aggregate_win_rate(results),
-            "eval/avg_turns": aggregate_avg_turns(results),
-            "eval/episodes": sum(r.episodes for r in results),
+        self.log_eval_metrics({
+            "win_rate": aggregate_win_rate(results),
+            "avg_turns": aggregate_avg_turns(results),
+            "episodes": sum(r.episodes for r in results),
         }, step)
         return results
 
@@ -116,19 +116,13 @@ class Sb3Trainer:
     # Logging
     # ------------------------------------------------------------------
 
-    def log_metrics(self, metrics: dict, step: int) -> None:
+    def log_eval_metrics(self, metrics: dict, step: int) -> None:
+        """记录 eval 指标到 W&B（训练指标走 TensorBoard sync，不在此重复）。"""
         if self.args.wandb:
             import wandb
-            wandb.log({k: v for k, v in metrics.items() if v is not None}, step=step)
+            wandb.log({"eval/" + k: v for k, v in metrics.items() if v is not None}, step=step)
         else:
             logging.info("step=%d %s", step, metrics)
-
-    def _collect_metrics(self) -> dict:
-        t = self._win_cb._tracker
-        return {
-            "win_rate_global": t.win_rate_global,
-            "win_rate_window": t.win_rate_window,
-        }
 
     def _init_logging(self) -> None:
         logging.basicConfig(level=logging.INFO, format="%(message)s")
@@ -140,5 +134,4 @@ class Sb3Trainer:
                 config=vars(self.args),
                 dir=self.save_dir,
                 sync_tensorboard=True,
-                monitor_gym=True,
             )

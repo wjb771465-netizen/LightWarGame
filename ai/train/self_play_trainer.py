@@ -71,6 +71,7 @@ class SelfPlayTrainer(Sb3Trainer):
         chunk = self.args.checkpoint_freq
         while agent.num_timesteps < total:
             agent.learn(min(chunk, total - agent.num_timesteps), callback=[self._win_cb])
+            agent._model._custom_logger = True
             step = agent.num_timesteps
             ckpt = os.path.join(self.save_dir, f"ckpt_{step}")
             agent.save(ckpt)
@@ -93,8 +94,6 @@ class SelfPlayTrainer(Sb3Trainer):
                 evicted, _, _ = self._pool.add(ckpt_zip, step)
                 if evicted is not None:
                     logging.info("[SelfPlay] 池满，淘汰: %s (step=%d)", evicted.path, evicted.step)
-
-            self.log_metrics(self._collect_metrics(), step)
 
             # 采样 n_opponents 种对手，每种发给 per_opponent 个 env
             specs = self._sample_opponent_specs(self._pool, n_opponents, opponent_id)

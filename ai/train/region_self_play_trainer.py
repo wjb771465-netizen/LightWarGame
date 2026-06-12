@@ -137,6 +137,7 @@ class RegionSelfPlayTrainer(SelfPlayTrainer):
                              R, R, info_str, n_envs, per_opponent)
 
                 agent.learn(steps, callback=[win_cb])
+                agent._model._custom_logger = True
                 step = agent.num_timesteps
 
                 ckpt = os.path.join(self._region_dir(R), f"ckpt_{step}")
@@ -159,10 +160,9 @@ class RegionSelfPlayTrainer(SelfPlayTrainer):
                     self.pool.add(R, ckpt_zip, step)
 
                 t = win_cb._tracker
-                self.log_metrics({
-                    f"region_{R}/win_rate_global": t.win_rate_global,
-                    f"region_{R}/win_rate_window": t.win_rate_window,
-                }, step)
+                logging.info("[RegionSP R=%d] step=%d win_rate_global=%.3f win_rate_window=%s",
+                             R, step, t.win_rate_global,
+                             f"{t.win_rate_window:.3f}" if t.win_rate_window is not None else "N/A")
 
             max_workers = max(1, min(self.args.parallel_regions, len(active)))
             with ThreadPoolExecutor(max_workers=max_workers) as executor:
@@ -204,11 +204,11 @@ class RegionSelfPlayTrainer(SelfPlayTrainer):
     # Helpers
     # ------------------------------------------------------------------
 
-    def log_metrics(self, metrics: dict, step: int) -> None:
+    def log_eval_metrics(self, metrics: dict, step: int) -> None:
         if self.args.wandb:
             import wandb
             with self._log_lock:
-                wandb.log({k: v for k, v in metrics.items() if v is not None}, step=step)
+                wandb.log({"eval/" + k: v for k, v in metrics.items() if v is not None}, step=step)
         else:
             logging.info("step=%d %s", step, metrics)
 
