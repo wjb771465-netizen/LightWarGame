@@ -144,11 +144,13 @@ def _get_eval_config(parser: argparse.ArgumentParser) -> argparse.ArgumentParser
                        help="评估对手种类数（default: 与 --n-opponents 或 --n-envs 相同）")
     group.add_argument("--eval-episodes", type=int, default=50,
                        help="每个对手评估局数（default: 50）")
-    group.add_argument("--eval-opponent", type=str, default="random",
-                       choices=["random", "rule"],
-                       help="固定评估对手类型：random | rule（default: random）")
+    group.add_argument("--eval-opponent", type=str, default=None,
+                       help="固定评估对手类型，逗号分隔多个（如 random,rule）。"
+                            "None=仅自博弈池对手（default: None）")
     group.add_argument("--eval-opponent-path", type=str, default=None,
                        help="固定评估对手模型路径（优先级高于 --eval-opponent）")
+    group.add_argument("--eval-opponent-freq", type=int, default=1,
+                       help="每 N 个 checkpoint 跑一次固定对手评估（default: 1=每次）")
     return parser
 
 

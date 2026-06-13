@@ -56,7 +56,8 @@ class RegionSelfPlayTrainer(SelfPlayTrainer):
                     "opp_region": rid,
                 })
             else:
-                specs.append({"type": "rule", "player_id": opponent_id})
+                specs.append({"type": self.args.self_play_initial_opponent,
+                               "player_id": opponent_id})
         return specs
 
     # ------------------------------------------------------------------
@@ -81,7 +82,7 @@ class RegionSelfPlayTrainer(SelfPlayTrainer):
             envs[R] = env
             agents[R] = SB3Policy(
                 env=env, args=self.args,
-                tb_log_dir=os.path.join(self._region_dir(R), "tb"),
+                tb_log_dir=self._region_dir(R),
             )
             win_cbs[R] = WinRateCallback(window=self.args.win_rate_window)
 
@@ -146,7 +147,7 @@ class RegionSelfPlayTrainer(SelfPlayTrainer):
 
                 ckpt_zip = ckpt + ".zip"
                 if self.args.use_eval:
-                    results = self.run_eval(ckpt, env, step, region=R)
+                    results = self.eval(ckpt, env, step, region=R)
                     prev_elo = agent_elos[R]
                     evicted, agent_elos[R], accepted = self.pool.add(
                         R, ckpt_zip, step, elo=agent_elos[R], outcomes=results)
@@ -159,10 +160,8 @@ class RegionSelfPlayTrainer(SelfPlayTrainer):
                 else:
                     self.pool.add(R, ckpt_zip, step)
 
-                t = win_cb._tracker
-                logging.info("[RegionSP R=%d] step=%d win_rate_global=%.3f win_rate_window=%s",
-                             R, step, t.win_rate_global,
-                             f"{t.win_rate_window:.3f}" if t.win_rate_window is not None else "N/A")
+                if self.args.use_eval:
+                    self.log_eval_metrics({"elo": agent_elos[R]}, step, region=R)
 
             max_workers = max(1, min(self.args.parallel_regions, len(active)))
             with ThreadPoolExecutor(max_workers=max_workers) as executor:
@@ -180,42 +179,51 @@ class RegionSelfPlayTrainer(SelfPlayTrainer):
     # Eval opponents
     # ------------------------------------------------------------------
 
-    def choose_eval_opponents(self, env, region: int | None = None) -> list[dict]:
-        """从 RegionPool 采样 eval 对手，覆写父类逻辑。"""
+    def choose_eval_opponents(self, env, include_fixed: bool = True, region: int | None = None) -> list[dict]:
+        """从 RegionPool 采样 eval 对手 + 可选固定对手。"""
         eval_n_envs = self.args.eval_n_envs or self.args.n_envs
         eval_n_opponents = self.args.eval_n_opponents or self.args.n_opponents or self.args.n_envs
         opponent_id = self._opponent_id(env)
         R = region if region is not None else self.regions[0]
 
         if not self.pool.available_regions():
-            specs = eval_n_envs * [
-                {"type": "rule", "player_id": opponent_id},
+            pool_specs = eval_n_envs * [
+                {"type": self.args.self_play_initial_opponent, "player_id": opponent_id},
             ]
         else:
             per_opponent = max(1, eval_n_envs // eval_n_opponents)
             specs = self._sample_opponent_specs(self.pool, eval_n_opponents, opponent_id,
                                                 exclude_region=R)
-            out = []
+            pool_specs = []
             for spec in specs:
-                out.extend([spec] * per_opponent)
-            specs = out[:eval_n_envs]
+                pool_specs.extend([spec] * per_opponent)
+            pool_specs = pool_specs[:eval_n_envs]
 
-        for spec in specs:
+        if include_fixed and self.args.eval_opponent:
+            half = max(1, eval_n_envs // 2)
+            pool_specs = pool_specs[:half]
+            fixed_specs = self._fixed_opponent_specs(eval_n_envs - half, opponent_id)
+            pool_specs = pool_specs + fixed_specs
+
+        for spec in pool_specs:
             if spec.get("opp_region") is None:
                 spec["opp_region"] = random.choice([r for r in self.regions if r != R])
-        return specs
+        return pool_specs
 
     # ------------------------------------------------------------------
     # Helpers
     # ------------------------------------------------------------------
 
-    def log_eval_metrics(self, metrics: dict, step: int) -> None:
+    def log_eval_metrics(self, metrics: dict, step: int, region: int | None = None) -> None:
         if self.args.wandb:
             import wandb
             with self._log_lock:
-                wandb.log({"eval/" + k: v for k, v in metrics.items() if v is not None}, step=step)
+                prefix = f"region_{region}_eval/" if region is not None else "eval/"
+                data = {"global_step": step}
+                data.update({prefix + k: v for k, v in metrics.items() if v is not None})
+                wandb.log(data)
         else:
-            logging.info("step=%d %s", step, metrics)
+            logging.info("step=%d region=%s %s", step, region, metrics)
 
     def _region_dir(self, R: int) -> str:
         return os.path.join(self.save_dir, f"region_{R}")

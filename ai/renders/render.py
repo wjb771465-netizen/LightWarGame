@@ -12,7 +12,8 @@ def _render_episode(policy: SB3Policy, scenario: str, ep: int, out_dir: str,
                     max_turns: int | None = None,
                     agent_capital: int | None = None,
                     opponent_capital: int | None = None,
-                    opponent_policy: SB3Policy | None = None) -> tuple[int, int | None]:
+                    opponent_policy: SB3Policy | None = None,
+                    opponent_spec: dict | None = None) -> tuple[int, int | None]:
     png_dir = os.path.join(out_dir, f"ep{ep:02d}", "png")
     os.makedirs(png_dir, exist_ok=True)
 
@@ -21,7 +22,9 @@ def _render_episode(policy: SB3Policy, scenario: str, ep: int, out_dir: str,
         env.config.game.max_turns = max_turns
     if agent_capital is not None and opponent_capital is not None:
         env.set_capitals(agent_capital, opponent_capital)
-    if opponent_policy is not None:
+    if opponent_spec is not None:
+        env.set_opponent(opponent_spec)
+    elif opponent_policy is not None:
         from ai.envs.opponents import PolicyOpponent
         env.opponent = PolicyOpponent(
             player_id=2, policy=opponent_policy,

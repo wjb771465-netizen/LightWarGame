@@ -42,20 +42,16 @@ def evaluate(
     agent_path: str,
     opponent_specs: list[dict],
     scenario: str,
-    episodes_per_opponent: int,
+    episodes_per_env: int,
     agent_capital: int | None = None,
 ) -> list[EvalResult]:
-    """N 进程并行评估，每个对手跑 episodes_per_opponent 局（由分配给它的进程平分）。
-
-    与训练对齐：opponent_specs 是 n_envs 个 spec 的扁平列表，同种对手连续排列。
-    每个对手分配给 per = n_envs / n_opponents 个进程，每个进程跑
-    episodes_per_opponent / per 局。
+    """N 进程并行评估，每个进程跑 episodes_per_env 局。
 
     Args:
         agent_path: checkpoint 路径（不含 .zip 后缀）
-        opponent_specs: 每个 eval 进程的对手描述（长度 = eval_n_envs，同种对手连续）
+        opponent_specs: 每个 eval 进程的对手描述（长度 = N）
         scenario: env 配置名
-        episodes_per_opponent: 每种对手的总评估局数
+        episodes_per_env: 每个进程跑的局数
 
     Returns:
         每个进程一个 EvalResult（长度 = len(opponent_specs)）
@@ -63,10 +59,6 @@ def evaluate(
     n = len(opponent_specs)
     if n == 0:
         return []
-
-    n_opponents = _count_unique(opponent_specs)
-    per = n // n_opponents  # 进程数 / 对手种类
-    episodes_per_env = episodes_per_opponent // per
 
     if n == 1:
         return [_evaluate_one(agent_path, opponent_specs[0], scenario, episodes_per_env, agent_capital)]
@@ -113,15 +105,6 @@ def aggregate_avg_turns(results: list[EvalResult]) -> float | None:
 # ---------------------------------------------------------------------------
 # Internal
 # ---------------------------------------------------------------------------
-
-def _count_unique(specs: list[dict]) -> int:
-    """统计扁平 spec 列表中不同的对手种类数。"""
-    seen: set[tuple] = set()
-    for s in specs:
-        key = tuple(sorted(s.items()))
-        seen.add(key)
-    return len(seen)
-
 
 def _evaluate_one(
     agent_path: str,

@@ -78,7 +78,7 @@ class SelfPlayTrainer(Sb3Trainer):
 
             ckpt_zip = ckpt + ".zip"
             if self.args.use_eval:
-                results = self.run_eval(ckpt, env, step)
+                results = self.eval(ckpt, env, step)
                 prev_elo = agent_elo
                 evicted, agent_elo, accepted = self._pool.add(
                     ckpt_zip, step, elo=agent_elo, outcomes=results)
@@ -91,9 +91,11 @@ class SelfPlayTrainer(Sb3Trainer):
                     logging.info("[SelfPlay] step=%d, ELO %.1f -> %.1f, 跳过入池",
                                  step, prev_elo, agent_elo)
             else:
-                evicted, _, _ = self._pool.add(ckpt_zip, step)
+                evicted, agent_elo, _ = self._pool.add(ckpt_zip, step)
                 if evicted is not None:
                     logging.info("[SelfPlay] 池满，淘汰: %s (step=%d)", evicted.path, evicted.step)
+
+            self.log_eval_metrics({"elo": agent_elo}, step)
 
             # 采样 n_opponents 种对手，每种发给 per_opponent 个 env
             specs = self._sample_opponent_specs(self._pool, n_opponents, opponent_id)
@@ -113,25 +115,35 @@ class SelfPlayTrainer(Sb3Trainer):
 
         agent.save(os.path.join(self.save_dir, "final"))
         logging.info("模型已保存至 %s/final.zip", self.save_dir)
+        self.render(os.path.join(self.save_dir, "final"))
 
     # ------------------------------------------------------------------
     # Eval opponents
     # ------------------------------------------------------------------
 
-    def choose_eval_opponents(self, env, region: int | None = None) -> list[dict]:
-        """从 OpponentPool 采样 eval 对手，覆写父类固定对手逻辑。"""
+    def choose_eval_opponents(self, env, include_fixed: bool = True, region: int | None = None) -> list[dict]:
+        """从 OpponentPool 采样 eval 对手 + 可选固定对手。"""
         eval_n_envs = self.args.eval_n_envs or self.args.n_envs
         eval_n_opponents = self.args.eval_n_opponents or self.args.n_opponents or self.args.n_envs
         opponent_id = self._opponent_id(env)
 
         if len(self._pool) == 0:
-            return eval_n_envs * [
+            pool_specs = eval_n_envs * [
                 {"type": self.args.self_play_initial_opponent, "player_id": opponent_id},
             ]
+        else:
+            per_opponent = max(1, eval_n_envs // eval_n_opponents)
+            specs = self._sample_opponent_specs(self._pool, eval_n_opponents, opponent_id)
+            pool_specs = []
+            for spec in specs:
+                pool_specs.extend([spec] * per_opponent)
+            pool_specs = pool_specs[:eval_n_envs]
 
-        per_opponent = max(1, eval_n_envs // eval_n_opponents)
-        specs = self._sample_opponent_specs(self._pool, eval_n_opponents, opponent_id)
-        out = []
-        for spec in specs:
-            out.extend([spec] * per_opponent)
-        return out[:eval_n_envs]
+        if not (include_fixed and self.args.eval_opponent):
+            return pool_specs
+
+        # 固定对手与池对手各占一半 env
+        half = max(1, eval_n_envs // 2)
+        pool_specs = pool_specs[:half]
+        fixed_specs = self._fixed_opponent_specs(eval_n_envs - half, opponent_id)
+        return pool_specs + fixed_specs
