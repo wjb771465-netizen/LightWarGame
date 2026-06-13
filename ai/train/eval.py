@@ -43,6 +43,7 @@ def evaluate(
     opponent_specs: list[dict],
     scenario: str,
     episodes_per_opponent: int,
+    agent_capital: int | None = None,
 ) -> list[EvalResult]:
     """N 进程并行评估，每个对手跑 episodes_per_opponent 局（由分配给它的进程平分）。
 
@@ -68,14 +69,14 @@ def evaluate(
     episodes_per_env = episodes_per_opponent // per
 
     if n == 1:
-        return [_evaluate_one(agent_path, opponent_specs[0], scenario, episodes_per_env)]
+        return [_evaluate_one(agent_path, opponent_specs[0], scenario, episodes_per_env, agent_capital)]
 
     # 用 spawn 上下文避免与训练 SubprocVecEnv 的 forkserver 冲突
     ctx = mp.get_context("spawn")
     results = [None] * n
     with ProcessPoolExecutor(max_workers=n, mp_context=ctx) as executor:
         futures = {
-            executor.submit(_evaluate_one, agent_path, spec, scenario, episodes_per_env): i
+            executor.submit(_evaluate_one, agent_path, spec, scenario, episodes_per_env, agent_capital): i
             for i, spec in enumerate(opponent_specs)
         }
         for f in futures:
@@ -127,10 +128,14 @@ def _evaluate_one(
     opponent_spec: dict,
     scenario: str,
     episodes: int,
+    agent_capital: int | None = None,
 ) -> EvalResult:
     """单个进程：创建 env → 加载模型 → 跑 episodes 局。"""
     env = LwgEnv(scenario)
     env.set_opponent(opponent_spec)
+    opp_cap = opponent_spec.get("opp_region")
+    if agent_capital is not None and opp_cap is not None:
+        env.set_capitals(agent_capital, opp_cap)
     agent = SB3Policy(path=agent_path)
 
     wins = 0

@@ -118,7 +118,7 @@ class SelfPlayTrainer(Sb3Trainer):
     # Eval opponents
     # ------------------------------------------------------------------
 
-    def choose_eval_opponents(self, env) -> list[dict]:
+    def choose_eval_opponents(self, env, region: int | None = None) -> list[dict]:
         """从 OpponentPool 采样 eval 对手，覆写父类固定对手逻辑。"""
         eval_n_envs = self.args.eval_n_envs or self.args.n_envs
         eval_n_opponents = self.args.eval_n_opponents or self.args.n_opponents or self.args.n_envs

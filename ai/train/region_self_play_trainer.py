@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import logging
 import os
+import random
 import threading
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
@@ -123,7 +124,7 @@ class RegionSelfPlayTrainer(SelfPlayTrainer):
                     env.env_method("set_opponent", spec, indices=indices)
                     opp_region = spec.get("opp_region")
                     if opp_region is None:
-                        opp_region = next(r for r in self.regions if r != R)
+                        opp_region = random.choice([r for r in self.regions if r != R])
                     env.env_method("set_capitals", R, opp_region, indices=indices)
                     if spec["type"] == "policy":
                         opp_info.append((opp_region, int(spec["path"].rsplit("ckpt_", 1)[-1])))
@@ -145,8 +146,7 @@ class RegionSelfPlayTrainer(SelfPlayTrainer):
 
                 ckpt_zip = ckpt + ".zip"
                 if self.args.use_eval:
-                    self._eval_region = R
-                    results = self.run_eval(ckpt, env, step)
+                    results = self.run_eval(ckpt, env, step, region=R)
                     prev_elo = agent_elos[R]
                     evicted, agent_elos[R], accepted = self.pool.add(
                         R, ckpt_zip, step, elo=agent_elos[R], outcomes=results)
@@ -180,25 +180,30 @@ class RegionSelfPlayTrainer(SelfPlayTrainer):
     # Eval opponents
     # ------------------------------------------------------------------
 
-    def choose_eval_opponents(self, env) -> list[dict]:
+    def choose_eval_opponents(self, env, region: int | None = None) -> list[dict]:
         """从 RegionPool 采样 eval 对手，覆写父类逻辑。"""
         eval_n_envs = self.args.eval_n_envs or self.args.n_envs
         eval_n_opponents = self.args.eval_n_opponents or self.args.n_opponents or self.args.n_envs
         opponent_id = self._opponent_id(env)
-        R = getattr(self, "_eval_region", self.regions[0])
+        R = region if region is not None else self.regions[0]
 
         if not self.pool.available_regions():
-            return eval_n_envs * [
+            specs = eval_n_envs * [
                 {"type": "rule", "player_id": opponent_id},
             ]
+        else:
+            per_opponent = max(1, eval_n_envs // eval_n_opponents)
+            specs = self._sample_opponent_specs(self.pool, eval_n_opponents, opponent_id,
+                                                exclude_region=R)
+            out = []
+            for spec in specs:
+                out.extend([spec] * per_opponent)
+            specs = out[:eval_n_envs]
 
-        per_opponent = max(1, eval_n_envs // eval_n_opponents)
-        specs = self._sample_opponent_specs(self.pool, eval_n_opponents, opponent_id,
-                                            exclude_region=R)
-        out = []
         for spec in specs:
-            out.extend([spec] * per_opponent)
-        return out[:eval_n_envs]
+            if spec.get("opp_region") is None:
+                spec["opp_region"] = random.choice([r for r in self.regions if r != R])
+        return specs
 
     # ------------------------------------------------------------------
     # Helpers

@@ -74,9 +74,9 @@ class Sb3Trainer:
     # Eval
     # ------------------------------------------------------------------
 
-    def run_eval(self, ckpt: str, env, step: int) -> list:
+    def run_eval(self, ckpt: str, env, step: int, region: int | None = None) -> list:
         """评估 agent vs 对手并记录指标。子类覆写 choose_eval_opponents 以接入 pool。"""
-        specs = self.choose_eval_opponents(env)
+        specs = self.choose_eval_opponents(env, region=region)
         if not specs:
             return []
 
@@ -84,7 +84,8 @@ class Sb3Trainer:
 
         logging.info("[Eval] step=%d n_envs=%d episodes_per=%d",
                      step, len(specs), self.args.eval_episodes)
-        results = evaluate(ckpt, specs, self.args.scenario, self.args.eval_episodes)
+        results = evaluate(ckpt, specs, self.args.scenario, self.args.eval_episodes,
+                           agent_capital=region)
 
         self.log_eval_metrics({
             "win_rate": aggregate_win_rate(results),
@@ -93,7 +94,7 @@ class Sb3Trainer:
         }, step)
         return results
 
-    def choose_eval_opponents(self, env) -> list[dict]:
+    def choose_eval_opponents(self, env, region: int | None = None) -> list[dict]:
         """eval_n_envs 个固定对手 spec。SelfPlay/RegionSelfPlay 子类覆写以接入 pool。"""
         eval_n_envs = self.args.eval_n_envs or self.args.n_envs
         opponent_id = self._opponent_id(env)
