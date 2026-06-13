@@ -42,6 +42,7 @@ saves/
 ref
 
 # 训练/渲染产物
+ai/train/results
 ai/train/results/
 ai/renders/results/
 *.pt

@@ -29,5 +29,8 @@ git_snapshot() {
         git branch -f exp "$commit"
         git tag "exp/${tag_name}" "$commit"
         echo "[snapshot] exp/${tag_name} -> ${commit:0:8}"
+        git push -f origin exp 2>/dev/null && git push origin "exp/${tag_name}" 2>/dev/null \
+            && echo "[snapshot] 已推送到 origin" >&2 \
+            || echo "[snapshot] push 失败（不影响训练）" >&2
     ) || echo "[snapshot] 快照失败（不影响训练）" >&2
 }
