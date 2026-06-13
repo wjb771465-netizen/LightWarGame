@@ -1,7 +1,9 @@
 from __future__ import annotations
 
+from pathlib import Path
 from typing import List, Optional
 
+from game.chat import ChatRoom
 from game.datatypes.command import Command
 from game.datatypes.state import GameState
 from game.save_load import save_game, save_turn_map, save_turn_obs
@@ -11,10 +13,17 @@ from game.ui_ports import GameUiPort
 class GameRunner:
     """主循环：按 UI 约定展示 → 收集指令 → `check_cmds` → `apply_cmds` → `settle`，直至终局。"""
 
-    def __init__(self, state: GameState, ui: GameUiPort, save_path: Optional[str] = None) -> None:
+    def __init__(
+        self,
+        state: GameState,
+        ui: GameUiPort,
+        save_path: Optional[str] = None,
+        chat_room: Optional[ChatRoom] = None,
+    ) -> None:
         self.state = state
         self.ui = ui
         self._save_path = save_path
+        self._chat_room = chat_room
 
     def run_single_turn(self) -> bool:
         """
@@ -27,6 +36,8 @@ class GameRunner:
         ui.show_turn_start(state)
         #ui.show_state(state)
         save_turn_map(state)
+        if self._chat_room is not None:
+            ui.run_diplomacy(state, self._chat_room)
         commands: List[Command] = []
         for p in state.active_players:
             obs = state.get_observation(p)
@@ -45,4 +56,6 @@ class GameRunner:
         while self.run_single_turn():
             if self._save_path:
                 save_game(self.state, self._save_path)
+            if self._chat_room is not None and self._save_path:
+                self._chat_room.save(str(Path(self._save_path).parent / "chat.json"))
         self.ui.show_game_result(self.state)

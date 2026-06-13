@@ -9,6 +9,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any, List, Optional
 
+from game.chat import ChatMessage, ChatRoom
 from game.constants import max_commands
 from game.datatypes.command import Command
 from game.datatypes.state import GameState
@@ -31,6 +32,7 @@ class AIGameUi(TerminalGameUi):
         obs_encoder: Any,
         act_encoder: Any,
         log_path: Optional[str] = None,
+        diplomats: Optional[dict[int, Any]] = None,
     ) -> None:
         import logging
         logging.basicConfig(level=logging.INFO, format="%(message)s")
@@ -39,6 +41,7 @@ class AIGameUi(TerminalGameUi):
         self._obs_enc = obs_encoder
         self._act_enc = act_encoder
         self._log_path = Path(log_path) if log_path else None
+        self._diplomats: dict[int, Any] = diplomats or {}
 
     def collect_commands(self, state: GameState, player_id: int) -> List[Command]:
         if player_id not in self._policies:
@@ -63,10 +66,24 @@ class AIGameUi(TerminalGameUi):
             cmds.append(cmd)
         return cmds
 
+    def run_diplomacy(self, state: GameState, chat_room: ChatRoom) -> None:
+        for pid, diplomat in self._diplomats.items():
+            if pid not in state.active_players:
+                continue
+            name = f"玩家{pid}"
+            msg = diplomat.generate_message(state, chat_room, pid)
+            if msg:
+                chat_room.add_message(ChatMessage(pid, name, msg, state.turn))
+                print(f"\n[外交 {name}] {msg}")
+        for pid in state.active_players:
+            if pid not in self._policies and pid not in self._diplomats:
+                resp = input(f"\n[外交 玩家{pid}] 发言（Enter 跳过）: ").strip()
+                if resp:
+                    chat_room.add_message(ChatMessage(pid, f"玩家{pid}", resp, state.turn))
+
     def _log_decision(self, turn: int, player_id: int, step: int, quota: int,
                       cmd: Optional[Command], state: GameState, mask) -> None:
         import logging
-
         valid_n = int(mask.sum())
         if cmd is not None:
             src = state.game_map.regions[cmd.source]

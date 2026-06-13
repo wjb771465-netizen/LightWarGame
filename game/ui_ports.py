@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from typing import List, Protocol, runtime_checkable
 
+from game.chat import ChatRoom
 from game.datatypes.command import Command
 from game.datatypes.game_obs import Observation
 from game.datatypes.state import GameState
@@ -46,6 +47,9 @@ class GameUiPort(Protocol):
         """提示并收集该玩家本回合指令。"""
         ...
 
+    def run_diplomacy(self, state: GameState, chat_room: ChatRoom) -> None:
+        """外交阶段：各方发言、人类玩家回应。"""
+        ...
 
 
 class PlaceholderGameUi:
@@ -74,3 +78,6 @@ class PlaceholderGameUi:
 
     def collect_commands(self, state: GameState, player_id: int) -> List[Command]:
         return []
+
+    def run_diplomacy(self, state: GameState, chat_room: ChatRoom) -> None:
+        pass

@@ -48,7 +48,7 @@ def collect_commands_for_player(
         if len(commands) >= max_cmd_count:
             print(f"已达上限 {max_cmd_count} 条，自动结束")
             break
-        line = inp("> ").strip()
+        line = ''.join(c for c in inp("> ") if c.isprintable()).strip()
         if not line:
             print(f"玩家 {player_id} 指令结束，共 {len(commands)} 条")
             break

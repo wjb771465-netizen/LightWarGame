@@ -1,5 +1,13 @@
 {
-  "comment": "编辑此文件设置各玩家的模型路径，启动游戏时交互选择是否启用 AI",
-  "1": "ai/train/results/1v1/region_selfplay/run_20260609_120357/region_4/ckpt_1007616",
-  "2": "ai/train/results/1v1/region_selfplay/run_20260609_120357/region_20/ckpt_1007616"
+  "comment": "编辑此文件设置各玩家的模型路径和外交配置，启动游戏时交互选择是否启用 AI",
+  "1": {
+    "model": "saves/4.zip",
+    "diplomat": true,
+    "persona": "queen"
+  },
+  "2": {
+    "model": "saves/4.zip",
+    "diplomat": true,
+    "persona": "aggressive"
+  }
 }
