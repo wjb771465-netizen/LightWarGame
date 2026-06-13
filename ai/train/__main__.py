@@ -1,4 +1,4 @@
-"""训练入口：python -m ai.train --scenario 1v1/vsbaseline"""
+"""训练入口：python -m ai.train --scenario duel/vsbaseline"""
 
 from ai.train.args import get_config
 from ai.train.sb3_trainer import Sb3Trainer

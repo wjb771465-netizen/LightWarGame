@@ -3,10 +3,17 @@
 # 用法：bash ai/train/train_vsrule.sh [额外参数]
 set -euo pipefail
 
-SCENARIO="1v1/vsrule"
+SCENARIO="duel/vsrule"
 EXP_NAME="vsrule_mlp256"
 
-cd "$(dirname "$0")/../../.."
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+source "$SCRIPT_DIR/snapshot.sh"
+
+cd "$SCRIPT_DIR/../../.."
+
+TS=$(date +%Y%m%d_%H%M%S)
+SAVE_DIR="ai/train/results/$SCENARIO/$EXP_NAME/run_$TS"
+git_snapshot "$SCENARIO/$EXP_NAME/run_$TS"
 
 CONDA_LIB="$(conda info --base)/envs/chinese_war_game/lib"
 conda run --no-capture-output -n chinese_war_game \
@@ -14,6 +21,7 @@ conda run --no-capture-output -n chinese_war_game \
   python -m ai.train \
   --scenario "$SCENARIO" \
   --exp-name "$EXP_NAME" \
+  --save-dir "$SAVE_DIR" \
   --total-timesteps 2000000 \
   --n-steps 2048 \
   --batch-size 64 \

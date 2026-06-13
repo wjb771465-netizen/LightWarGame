@@ -84,8 +84,8 @@ def run_render(policy: SB3Policy, scenario: str, out_dir: str, num_episodes: int
 def main() -> None:
     logging.basicConfig(level=logging.INFO, format="%(message)s")
     parser = argparse.ArgumentParser(description="渲染已训练的 LightWarGame 智能体对局")
-    parser.add_argument("--scenario", type=str, default="1v1/vsbaseline",
-                        help="env 配置名，如 1v1/vsbaseline")
+    parser.add_argument("--scenario", type=str, default="duel/vsbaseline",
+                        help="env 配置名，如 duel/vsbaseline")
     parser.add_argument("--model-dir", type=str, default=None,
                         help="训练结果目录；不传则自动使用该 scenario 最新的 run")
     parser.add_argument("--episodes", type=int, default=1,

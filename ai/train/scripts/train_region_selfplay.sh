@@ -3,10 +3,17 @@
 # 用法：bash ai/train/scripts/train_region_selfplay.sh [额外参数]
 set -euo pipefail
 
-SCENARIO="1v1/region_selfplay"
+SCENARIO="duel/region_selfplay"
 EXP_NAME="region_pfsp_4_20"
 
-cd "$(dirname "$0")/../../.."
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+source "$SCRIPT_DIR/snapshot.sh"
+
+cd "$SCRIPT_DIR/../../.."
+
+TS=$(date +%Y%m%d_%H%M%S)
+SAVE_DIR="ai/train/results/$SCENARIO/$EXP_NAME/run_$TS"
+git_snapshot "$SCENARIO/$EXP_NAME/run_$TS"
 
 CONDA_LIB="$(conda info --base)/envs/chinese_war_game/lib"
 conda run --no-capture-output -n chinese_war_game \
@@ -14,13 +21,17 @@ conda run --no-capture-output -n chinese_war_game \
   python -m ai.train \
   --scenario               "$SCENARIO" \
   --exp-name               "$EXP_NAME" \
+  --save-dir               "$SAVE_DIR" \
   --region-self-play \
   --region-self-play-regions 4,20 \
   --self-play-pool-size    100 \
+  --self-play-initial-opponent rule \
   --pool-sampling-strategy progress \
   --use-eval \
   --eval-episodes          20 \
-  --total-timesteps        1000000 \
+  --eval-opponent          random,rule \
+  --eval-opponent-freq     20 \
+  --total-timesteps        5000000 \
   --n-steps                2048 \
   --batch-size             512 \
   --n-epochs               10 \
@@ -29,7 +40,7 @@ conda run --no-capture-output -n chinese_war_game \
   --gae-lambda             0.97 \
   --clip-range             0.2 \
   --net-arch               256 256 \
-  --checkpoint-freq        8192 \
+  --checkpoint-freq        16384 \
   --win-rate-window        200 \
   --seed                   42 \
   --parallel-regions       2 \

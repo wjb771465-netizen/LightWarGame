@@ -3,10 +3,17 @@
 # 用法：bash ai/train/scripts/train_selfplay.sh [额外参数]
 set -euo pipefail
 
-SCENARIO="1v1/selfplay"
+SCENARIO="duel/selfplay"
 EXP_NAME="pfsp_mlp256"
 
-cd "$(dirname "$0")/../../.."
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+source "$SCRIPT_DIR/snapshot.sh"
+
+cd "$SCRIPT_DIR/../../.."
+
+TS=$(date +%Y%m%d_%H%M%S)
+SAVE_DIR="ai/train/results/$SCENARIO/$EXP_NAME/run_$TS"
+git_snapshot "$SCENARIO/$EXP_NAME/run_$TS"
 
 CONDA_LIB="$(conda info --base)/envs/chinese_war_game/lib"
 conda run --no-capture-output -n chinese_war_game \
@@ -14,6 +21,7 @@ conda run --no-capture-output -n chinese_war_game \
   python -m ai.train \
   --scenario "$SCENARIO" \
   --exp-name "$EXP_NAME" \
+  --save-dir "$SAVE_DIR" \
   --self-play \
   --self-play-pool-size 5 \
   --self-play-initial-opponent random \

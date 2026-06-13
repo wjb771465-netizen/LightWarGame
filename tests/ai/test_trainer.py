@@ -14,7 +14,7 @@ from ai.train.args import get_config
 from ai.envs.env import LwgEnv
 from ai.envs.utils import parse_config
 
-SCENARIO = "1v1/vsbaseline"
+SCENARIO = "duel/vsbaseline"
 SHORT_STEPS = 1024
 
 
@@ -80,34 +80,34 @@ class TestSelfPlayArgs(unittest.TestCase):
 
     def test_default_strategy_is_latest(self):
         parser = get_config()
-        args = parser.parse_args(["--scenario", "1v1/selfplay", "--self-play"])
+        args = parser.parse_args(["--scenario", "duel/selfplay", "--self-play"])
         self.assertEqual(args.pool_sampling_strategy, "latest")
 
     def test_strategy_choices(self):
         parser = get_config()
         for strategy in ("latest", "uniform", "progress", "elo"):
             args = parser.parse_args([
-                "--scenario", "1v1/selfplay", "--self-play",
+                "--scenario", "duel/selfplay", "--self-play",
                 "--pool-sampling-strategy", strategy,
             ])
             self.assertEqual(args.pool_sampling_strategy, strategy)
 
     def test_sampling_lam_default(self):
         parser = get_config()
-        args = parser.parse_args(["--scenario", "1v1/selfplay", "--self-play"])
+        args = parser.parse_args(["--scenario", "duel/selfplay", "--self-play"])
         self.assertEqual(args.sampling_lam, 1.0)
 
     def test_sampling_scale_default(self):
         parser = get_config()
-        args = parser.parse_args(["--scenario", "1v1/selfplay", "--self-play"])
+        args = parser.parse_args(["--scenario", "duel/selfplay", "--self-play"])
         self.assertEqual(args.sampling_scale, 100.0)
 
     def test_progress_D_default(self):
         parser = get_config()
-        args = parser.parse_args(["--scenario", "1v1/selfplay", "--self-play"])
+        args = parser.parse_args(["--scenario", "duel/selfplay", "--self-play"])
         self.assertIsNone(args.progress_D)
 
     def test_pool_size_default_is_20(self):
         parser = get_config()
-        args = parser.parse_args(["--scenario", "1v1/selfplay", "--self-play"])
+        args = parser.parse_args(["--scenario", "duel/selfplay", "--self-play"])
         self.assertEqual(args.self_play_pool_size, 20)

@@ -1,10 +1,17 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-SCENARIO="1v1/vspolicy"
+SCENARIO="duel/vspolicy"
 EXP_NAME="vspolicy_500k"
 
-cd "$(dirname "$0")/../../.."
+SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
+source "$SCRIPT_DIR/snapshot.sh"
+
+cd "$SCRIPT_DIR/../../.."
+
+TS=$(date +%Y%m%d_%H%M%S)
+SAVE_DIR="ai/train/results/$SCENARIO/$EXP_NAME/run_$TS"
+git_snapshot "$SCENARIO/$EXP_NAME/run_$TS"
 
 CONDA_LIB="$(conda info --base)/envs/chinese_war_game/lib"
 conda run --no-capture-output -n chinese_war_game \
@@ -12,6 +19,7 @@ conda run --no-capture-output -n chinese_war_game \
   python -m ai.train \
   --scenario "$SCENARIO" \
   --exp-name "$EXP_NAME" \
+  --save-dir "$SAVE_DIR" \
   --total-timesteps 5000000 \
   --n-steps 4096 \
   --batch-size 64 \

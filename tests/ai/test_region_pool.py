@@ -8,7 +8,7 @@ import unittest
 from ai.algos.region_pool import RegionPool
 from ai.envs.env import LwgEnv
 
-CONFIG = "1v1/region_selfplay"
+CONFIG = "duel/region_selfplay"
 
 
 class TestRegionPoolAdd(unittest.TestCase):
