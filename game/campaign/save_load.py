@@ -6,16 +6,16 @@ import json
 import logging
 import sys
 import webbrowser
+from pathlib import Path
 from typing import Any, Dict
 
 from game.datatypes.game_map import GameMap
 from game.datatypes.game_obs import observation_to_dict, Observation
 from game.datatypes.state import GameState
-from game.utils import get_saves_dir
 from game.ui.map_renderer import render_map
 
 
-def save_game(state: GameState, path: str = "save.json") -> None:
+def save_game(state: GameState, path: str) -> None:
     regions: list[Any] = [None]
     for r in state.game_map.regions[1:]:
         if r is None:
@@ -39,9 +39,9 @@ def save_game(state: GameState, path: str = "save.json") -> None:
         json.dump(data, f, ensure_ascii=False, indent=2)
 
 
-def save_turn_map(state: GameState) -> None:
-    """保存当前回合地图 PNG 到 saves/maps。"""
-    d = get_saves_dir() / "maps"
+def save_turn_map(state: GameState, save_dir: Path) -> None:
+    """保存当前回合地图 PNG 到 save_dir/maps。"""
+    d = save_dir / "maps"
     d.mkdir(parents=True, exist_ok=True)
     path = d / f"map_turn_{state.turn:03d}.png"
     render_map(state, str(path))
@@ -50,14 +50,13 @@ def save_turn_map(state: GameState) -> None:
         try:
             webbrowser.open(path.as_uri())
         except Exception:
-            pass  # 打开失败静默，不影响游戏流程
+            pass
 
 
-def save_turn_obs(obs: Observation, player: int, state: GameState) -> None:
-    """保存玩家观测 JSON 到 saves/maps。"""
-    d = get_saves_dir() 
-    d.mkdir(parents=True, exist_ok=True)
-    with open(d / f"obs_p{player}.json", "w", encoding="utf-8") as f:
+def save_turn_obs(obs: Observation, player: int, state: GameState, save_dir: Path) -> None:
+    """保存玩家观测 JSON 到 save_dir。"""
+    save_dir.mkdir(parents=True, exist_ok=True)
+    with open(save_dir / f"obs_p{player}.json", "w", encoding="utf-8") as f:
         json.dump(observation_to_dict(obs, state.game_map), f, ensure_ascii=False, indent=2)
 
 

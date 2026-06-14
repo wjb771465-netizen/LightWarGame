@@ -2,7 +2,7 @@ import os
 import tempfile
 import unittest
 
-from game.chat import ChatMessage, ChatRoom
+from game.campaign.chat import ChatMessage, ChatRoom
 
 
 class TestChatRoom(unittest.TestCase):

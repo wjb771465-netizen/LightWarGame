@@ -1,7 +1,7 @@
 import os
 import unittest
 
-from game.chat import ChatMessage, ChatRoom
+from game.campaign.chat import ChatMessage, ChatRoom
 from game.datatypes.game_map import Region
 from game.datatypes.state import GameState
 from llm.diplomat import LLMDiplomat

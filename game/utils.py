@@ -8,9 +8,9 @@ def get_project_root() -> Path:
     return Path(__file__).resolve().parent.parent
 
 
-def get_saves_dir() -> Path:
-    """存档根目录：<project_root>/saves。"""
-    return get_project_root() / "saves"
+def get_saves_dir(session_name: str) -> Path:
+    """Session 存档目录：game/campaign/sessions/{session_name}/save/。"""
+    return get_project_root() / "game" / "campaign" / "sessions" / session_name / "save"
 
 
 def parse_map_config(config_name: str) -> Dict[str, Any]:

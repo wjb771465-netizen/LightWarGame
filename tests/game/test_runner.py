@@ -1,11 +1,12 @@
 import os
 import tempfile
 import unittest
+from pathlib import Path
 
 from game.datatypes.game_map import GameMap, Region
 from game.datatypes.state import GameState
 from game.runner import GameRunner
-from game.save_load import load_game, save_game
+from game.campaign.save_load import load_game, save_game
 from game.ui_ports import PlaceholderGameUi
 
 from tests.helpers import map_with_regions as _map_with_regions
@@ -34,7 +35,7 @@ class TestGameRunner(unittest.TestCase):
         s = GameState(m, num_players=2)
         s.settle()
         self.assertEqual(len(s.active_players), 1)
-        r = GameRunner(s, PlaceholderGameUi())
+        r = GameRunner(s, PlaceholderGameUi(), save_path=Path(tempfile.mkdtemp()))
         self.assertIsNone(r.run())
         self.assertEqual(s.turn, 1)
 
@@ -48,7 +49,7 @@ class TestGameRunner(unittest.TestCase):
         m = _map_with_regions([None, a, b])
         s = GameState(m, num_players=2)
         self.assertEqual(len(s.active_players), 2)
-        r = GameRunner(s, PlaceholderGameUi())
+        r = GameRunner(s, PlaceholderGameUi(), save_path=Path(tempfile.mkdtemp()))
         cont = r.run_single_turn()
         self.assertTrue(cont)
         self.assertEqual(s.turn, 2)
@@ -61,7 +62,7 @@ class TestGameRunner(unittest.TestCase):
         s = GameState(m, num_players=2)
         s.settle()
         self.assertEqual(len(s.active_players), 1)
-        r = GameRunner(s, PlaceholderGameUi())
+        r = GameRunner(s, PlaceholderGameUi(), save_path=Path(tempfile.mkdtemp()))
         self.assertFalse(r.run_single_turn())
 
 

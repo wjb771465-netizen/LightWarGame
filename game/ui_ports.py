@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import List, Protocol, runtime_checkable
 
-from game.chat import ChatRoom
+from game.campaign.chat import ChatRoom
 from game.datatypes.command import Command
 from game.datatypes.game_obs import Observation
 from game.datatypes.state import GameState

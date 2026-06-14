@@ -9,7 +9,7 @@ from game.constants import max_commands
 from game.datatypes.game_map import GameMap
 from game.datatypes.state import GameState
 from game.ui.map_renderer import render_map
-from game.init_game import fixed_capitals, random_capitals
+from game.campaign.init_game import fixed_capitals, random_capitals
 
 from ai.algos.policy import SB3Policy
 from ai.envs.action import ActionEncoder

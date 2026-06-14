@@ -9,7 +9,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any, List, Optional
 
-from game.chat import ChatMessage, ChatRoom
+from game.campaign.chat import ChatMessage, ChatRoom
 from game.constants import max_commands
 from game.datatypes.command import Command
 from game.datatypes.state import GameState

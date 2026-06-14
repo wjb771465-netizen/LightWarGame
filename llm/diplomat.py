@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from game.chat import ChatRoom
+from game.campaign.chat import ChatRoom
 from game.datatypes.state import GameState
 from llm.base import BaseLLMAgent
 
@@ -11,7 +11,7 @@ class LLMDiplomat(BaseLLMAgent):
 
     def generate_message(self, state: GameState, chat_room: ChatRoom, player_id: int) -> str:
         state_text = self._render_state(state, player_id)
-        chat_text = self._render_chat(chat_room)
+        chat_text = self._render_chat(chat_room, player_id)
         user_content = (
             f"你是玩家{player_id}。\n\n"
             f"=== 当前战局 ===\n{state_text}\n\n"

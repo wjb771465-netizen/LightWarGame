@@ -7,7 +7,7 @@ from typing import Any
 import yaml
 from openai import OpenAI
 
-from game.chat import ChatRoom
+from game.campaign.chat import ChatRoom
 from game.datatypes.state import GameState
 
 _CONFIG_PATH = Path(__file__).parent / "config.yaml"
@@ -55,5 +55,12 @@ class BaseLLMAgent:
             f"对方：{' '.join(enemy) or '无'}"
         )
 
-    def _render_chat(self, chat_room: ChatRoom, max_turns: int = 5) -> str:
-        return chat_room.get_history_text(max_turns=max_turns)
+    def _render_chat(self, chat_room: ChatRoom, player_id: int, max_turns: int = 5) -> str:
+        if not chat_room._messages:
+            return "(无外交记录)"
+        cutoff = max(m.turn for m in chat_room._messages) - max_turns + 1
+        recent = [m for m in chat_room._messages if m.turn >= cutoff]
+        return "\n".join(
+            f"[回合{m.turn}] {m.sender_name}{'（我）' if m.sender_id == player_id else ''}: {m.text}"
+            for m in reversed(recent)
+        )

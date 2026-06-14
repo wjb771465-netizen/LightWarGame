@@ -1,7 +1,7 @@
 import unittest
 from unittest.mock import MagicMock, patch
 
-from game.chat import ChatRoom
+from game.campaign.chat import ChatRoom
 from llm.diplomat import LLMDiplomat
 from llm.prompts import build_diplomat_system_prompt
 from tests.helpers import map_with_regions
@@ -71,7 +71,7 @@ class TestLLMDiplomat(unittest.TestCase):
     def test_user_prompt_contains_chat_history(self):
         d = _make_diplomat()
         room = ChatRoom()
-        from game.chat import ChatMessage
+        from game.campaign.chat import ChatMessage
         room.add_message(ChatMessage(2, "玩家2", "你好弱", 4))
         d.generate_message(_make_state(), room, 1)
         user_prompt = d._call.call_args[0][0]

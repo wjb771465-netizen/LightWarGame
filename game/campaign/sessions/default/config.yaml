@@ -1,0 +1,8 @@
+name: "ai_test"
+num_players: 2
+capitals: [20, 4]
+ai_players:
+  2:
+    model: models/4.zip
+    persona: queen
+    diplomat: true
