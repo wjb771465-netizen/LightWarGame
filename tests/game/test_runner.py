@@ -32,6 +32,7 @@ class TestGameRunner(unittest.TestCase):
         b.owner = 1
         b.troops = 3
         m = _map_with_regions([None, a, b])
+        m._config_name = "cn"
         s = GameState(m, num_players=2)
         s.settle()
         self.assertEqual(len(s.active_players), 1)
@@ -47,6 +48,7 @@ class TestGameRunner(unittest.TestCase):
         b.owner = 2
         b.troops = 10
         m = _map_with_regions([None, a, b])
+        m._config_name = "cn"
         s = GameState(m, num_players=2)
         self.assertEqual(len(s.active_players), 2)
         r = GameRunner(s, PlaceholderGameUi(), save_path=Path(tempfile.mkdtemp()))
@@ -59,6 +61,7 @@ class TestGameRunner(unittest.TestCase):
         a.owner = 1
         a.troops = 5
         m = _map_with_regions([None, a])
+        m._config_name = "cn"
         s = GameState(m, num_players=2)
         s.settle()
         self.assertEqual(len(s.active_players), 1)

@@ -6,3 +6,5 @@ ai_players:
     model: models/4.zip
     persona: queen
     diplomat: true
+    name: Vivian
+    intro: 海外名校国际关系研究生，游戏高手，习惯叫你弟弟。

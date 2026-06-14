@@ -31,12 +31,13 @@ class GameRunner:
         否则完整一回合 UI + check_cmds + apply_cmds + settle；
         settle 返回 True 表示本局已结束 → 返回 False；否则返回 True 继续游戏。
         """
+        save_game(self.state, str(self._save_path / "save.json"))
         state = self.state
         ui = self.ui
         ui.show_turn_start(state)
         save_turn_map(state, self._save_path)
         if self._chat_room is not None:
-            ui.run_diplomacy(state, self._chat_room)
+            ui.run_diplomacy(state, self._chat_room, self._save_path / "chat.json")
         commands: List[Command] = []
         for p in state.active_players:
             obs = state.get_observation(p)
@@ -53,7 +54,5 @@ class GameRunner:
         self.ui.show_game_start(self.state)
         self.ui.wait_after_welcome()
         while self.run_single_turn():
-            save_game(self.state, str(self._save_path / "save.json"))
-            if self._chat_room is not None:
-                self._chat_room.save(str(self._save_path / "chat.json"))
+            pass
         self.ui.show_game_result(self.state)

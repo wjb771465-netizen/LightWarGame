@@ -66,7 +66,9 @@ class AIGameUi(TerminalGameUi):
             cmds.append(cmd)
         return cmds
 
-    def run_diplomacy(self, state: GameState, chat_room: ChatRoom) -> None:
+    def run_diplomacy(self, state: GameState, chat_room: ChatRoom, save_path=None) -> None:
+        if save_path is not None:
+            chat_room.load(str(save_path))
         for pid, diplomat in self._diplomats.items():
             if pid not in state.active_players:
                 continue
@@ -74,12 +76,16 @@ class AIGameUi(TerminalGameUi):
             msg = diplomat.generate_message(state, chat_room, pid)
             if msg:
                 chat_room.add_message(ChatMessage(pid, name, msg, state.turn))
+                if save_path is not None:
+                    chat_room.save(str(save_path))
                 print(f"\n[外交 {name}] {msg}")
         for pid in state.active_players:
             if pid not in self._policies and pid not in self._diplomats:
                 resp = input(f"\n[外交 玩家{pid}] 发言（Enter 跳过）: ").strip()
                 if resp:
                     chat_room.add_message(ChatMessage(pid, f"玩家{pid}", resp, state.turn))
+                    if save_path is not None:
+                        chat_room.save(str(save_path))
 
     def _log_decision(self, turn: int, player_id: int, step: int, quota: int,
                       cmd: Optional[Command], state: GameState, mask) -> None:

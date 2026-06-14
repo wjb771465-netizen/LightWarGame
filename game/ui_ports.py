@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from typing import List, Protocol, runtime_checkable
+from pathlib import Path
+from typing import List, Optional, Protocol, runtime_checkable
 
 from game.campaign.chat import ChatRoom
 from game.datatypes.command import Command
@@ -47,8 +48,8 @@ class GameUiPort(Protocol):
         """提示并收集该玩家本回合指令。"""
         ...
 
-    def run_diplomacy(self, state: GameState, chat_room: ChatRoom) -> None:
-        """外交阶段：各方发言、人类玩家回应。"""
+    def run_diplomacy(self, state: GameState, chat_room: ChatRoom, save_path: Optional[Path] = None) -> None:
+        """外交阶段：各方发言、人类玩家回应。save_path 非空时，在开头 load、每条消息后 save。"""
         ...
 
 
@@ -79,5 +80,5 @@ class PlaceholderGameUi:
     def collect_commands(self, state: GameState, player_id: int) -> List[Command]:
         return []
 
-    def run_diplomacy(self, state: GameState, chat_room: ChatRoom) -> None:
+    def run_diplomacy(self, state: GameState, chat_room: ChatRoom, save_path: Optional[Path] = None) -> None:
         pass

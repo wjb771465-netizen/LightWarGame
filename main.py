@@ -129,11 +129,12 @@ class GameLauncher:
         ).run()
 
     def _load_chat(self) -> ChatRoom:
+        chat_path = self.save_dir / "chat.json"
         room = ChatRoom()
-        if not self._is_new:
-            chat_path = self.save_dir / "chat.json"
-            if chat_path.exists():
-                room.load(str(chat_path))
+        if self._is_new:
+            chat_path.unlink(missing_ok=True)
+        elif chat_path.exists():
+            room.load(str(chat_path))
         return room
 
     def _build_ui(self, state, chat_room):
@@ -152,7 +153,13 @@ class GameLauncher:
         num_regions = len(state.game_map.regions) - 1
         max_players = (next(iter(policies.values())).obs_dim - 2) // num_regions - 6
         obs_enc = ObservationEncoder(state.game_map, max_players)
-        print("AI 玩家：" + "、".join(f"玩家{p}" for p in self.ai_ids))
+        for pid in self.ai_ids:
+            entry = self.ai_cfg[pid]
+            name = entry.get("name", f"玩家{pid}")
+            intro = entry.get("intro", "")
+            print(f"对手：{name}（玩家{pid}）")
+            if intro:
+                print(f"  {intro}")
         return AIGameUi(
             policies, obs_enc, act_enc,
             log_path=str(self.save_dir / "ai_decision.log"),
