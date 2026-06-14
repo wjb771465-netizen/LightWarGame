@@ -3,13 +3,12 @@ from .datatypes.command import Command
 from .datatypes.game_map import Region
 from .runner import GameRunner
 from .ui import TerminalGameUi
-from .ui_ports import GameUiPort, PlaceholderGameUi
+from .ui_ports import GameUiPort
 
 __all__ = [
     "Command",
     "GameRunner",
     "GameUiPort",
-    "PlaceholderGameUi",
     "Region",
     "TerminalGameUi",
 ]

@@ -9,7 +9,11 @@ from game.datatypes.game_obs import Observation
 from game.datatypes.state import GameState
 
 
-def show_game_start(state: GameState, out: Optional[TextIO] = None) -> None:
+def show_game_start(
+    state: GameState,
+    out: Optional[TextIO] = None,
+    setup_info: Optional[list[str]] = None,
+) -> None:
     o = out or sys.stdout
     print(
         "\n========== 中国地图战旗 ==========\n"
@@ -23,6 +27,10 @@ def show_game_start(state: GameState, out: Optional[TextIO] = None) -> None:
         f"本局人数：{state.num_players}\n",
         file=o,
     )
+    if setup_info:
+        for line in setup_info:
+            print(line, file=o)
+        print(file=o)
 
 
 def show_turn_start(state: GameState, out: Optional[TextIO] = None) -> None:

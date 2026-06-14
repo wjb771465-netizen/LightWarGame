@@ -1,9 +1,3 @@
-"""
-game/ui/ai_game_ui.py 的单元测试。
-
-用 mock 替代真实模型，验证 collect_commands 的路由逻辑。
-"""
-
 import unittest
 from unittest.mock import MagicMock, patch
 
@@ -12,13 +6,11 @@ import numpy as np
 from game.datatypes.command import Command
 from game.datatypes.game_map import Region
 from game.datatypes.state import GameState
-from game.ui.ai_game_ui import AIGameUi
 from game.ui.terminal_ui import TerminalGameUi
 from tests.helpers import map_with_regions
 
 
 def _make_state():
-    # 1(p1,10) ↔ 2(p2,10)，最小 2-player 场景
     a = Region("A", [2], 4); a.owner = 1; a.troops = 10; a.is_capital = True
     b = Region("B", [1], 4); b.owner = 2; b.troops = 10; b.is_capital = True
     return GameState(map_with_regions([None, a, b]), num_players=2)
@@ -29,7 +21,11 @@ def _make_ui(policies):
     obs_enc.encode.return_value = np.zeros(10, dtype=np.float32)
     act_enc = MagicMock()
     act_enc.mask.return_value = np.ones(5, dtype=bool)
-    return AIGameUi(policies, obs_enc, act_enc), obs_enc, act_enc
+    ui = TerminalGameUi()
+    ui._policies = policies
+    ui._obs_enc = obs_enc
+    ui._act_enc = act_enc
+    return ui, obs_enc, act_enc
 
 
 class TestAIGameUi(unittest.TestCase):
@@ -50,14 +46,16 @@ class TestAIGameUi(unittest.TestCase):
         policy.predict.assert_called_once()
 
     def test_human_player_delegates_terminal(self):
-        """非 AI 玩家：collect_commands 委托给 TerminalGameUi。"""
+        """非 AI 玩家：collect_commands 委托给 input_handler，不触发 policy。"""
         state = _make_state()
-        ui, _, _ = _make_ui({2: MagicMock()})  # 只有 player 2 是 AI
+        policy = MagicMock()
+        ui, _, _ = _make_ui({2: policy})
 
-        with patch.object(TerminalGameUi, "collect_commands", return_value=[]) as mock_terminal:
+        with patch("game.ui.input_handler.collect_commands_for_player", return_value=[]) as mock:
             result = ui.collect_commands(state, player_id=1)
-            mock_terminal.assert_called_once_with(state, 1)
+            mock.assert_called_once_with(state, 1, None)
 
+        policy.predict.assert_not_called()
         self.assertEqual(result, [])
 
     def test_noop_action_returns_empty(self):

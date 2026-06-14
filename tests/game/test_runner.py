@@ -7,9 +7,7 @@ from game.datatypes.game_map import GameMap, Region
 from game.datatypes.state import GameState
 from game.runner import GameRunner
 from game.campaign.save_load import load_game, save_game
-from game.ui_ports import PlaceholderGameUi
-
-from tests.helpers import map_with_regions as _map_with_regions
+from tests.helpers import map_with_regions as _map_with_regions, PlaceholderGameUi
 
 
 def _two_player_state(turn: int = 3) -> GameState:
