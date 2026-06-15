@@ -45,12 +45,12 @@ def save_turn_map(state: GameState, save_dir: Path) -> None:
     d.mkdir(parents=True, exist_ok=True)
     path = d / f"map_turn_{state.turn:03d}.png"
     render_map(state, str(path))
-    logging.info("[地图] 已保存 → %s", path)
     if "unittest" not in sys.modules:
         try:
             webbrowser.open(path.as_uri())
         except Exception:
             pass
+    return path
 
 
 def save_turn_obs(obs: Observation, player: int, state: GameState, save_dir: Path) -> None:

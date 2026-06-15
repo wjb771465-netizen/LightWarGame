@@ -24,6 +24,7 @@ class GameRunner:
         self.ui = ui
         self._save_path = save_path
         self._chat_room = chat_room
+        self._last_battle_report: list[tuple[int, int, int]] = []
 
     def run_single_turn(self) -> bool:
         """
@@ -34,10 +35,11 @@ class GameRunner:
         save_game(self.state, str(self._save_path / "save.json"))
         state = self.state
         ui = self.ui
-        ui.show_turn_start(state)
-        save_turn_map(state, self._save_path)
+        map_path = save_turn_map(state, self._save_path)
+        ui.show_turn_start(state, map_path)
         if self._chat_room is not None:
-            ui.run_diplomacy(state, self._chat_room, self._save_path / "chat.json")
+            ui.run_diplomacy(state, self._chat_room, self._save_path / "chat.json",
+                             self._last_battle_report)
         commands: List[Command] = []
         for p in state.active_players:
             obs = state.get_observation(p)
@@ -45,8 +47,8 @@ class GameRunner:
             save_turn_obs(obs, p, state, self._save_path)
             commands.extend(ui.collect_commands(state, p))
         valid_cmds = state.check_cmds(commands)
-        state.apply_cmds(valid_cmds)
-        ui.show_turn_results(state)
+        self._last_battle_report = state.apply_cmds(valid_cmds)
+        ui.show_turn_results(state, self._last_battle_report)
         return not state.settle()
 
     def run(self) -> None:

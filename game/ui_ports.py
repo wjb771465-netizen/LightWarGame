@@ -29,7 +29,7 @@ class GameUiPort(ABC):
         """欢迎信息展示完毕后，等待玩家确认再进入对局。"""
 
     @abstractmethod
-    def show_turn_start(self, state: GameState) -> None:
+    def show_turn_start(self, state: GameState, map_path: Path) -> None:
         """本回合开始（如第几回合）。"""
 
     @abstractmethod
@@ -48,9 +48,11 @@ class GameUiPort(ABC):
     def collect_commands(self, state: GameState, player_id: int) -> List[Command]:
         """提示并收集该玩家本回合指令。"""
 
-    def show_turn_results(self, state: GameState) -> None:
+    def show_turn_results(self, state: GameState,
+                          battle_report: list[tuple[int, int, int]]) -> None:
         """本回合结算战报；默认 no-op，子类按需覆盖。"""
 
     def run_diplomacy(self, state: GameState, chat_room: ChatRoom,
-                      save_path: Optional[Path] = None) -> None:
+                      save_path: Optional[Path] = None,
+                      battle_report: list[tuple[int, int, int]] | None = None) -> None:
         """外交阶段；默认 no-op，AI UI 覆盖。"""

@@ -8,6 +8,7 @@ from game.campaign.chat import ChatMessage, ChatRoom
 from game.constants import max_commands
 from game.datatypes.command import Command
 from game.datatypes.state import GameState
+from game.ui.display import format_battle_report
 
 
 def collect_ai_commands(
@@ -41,6 +42,7 @@ def run_ai_diplomacy(
     state: GameState,
     chat_room: ChatRoom,
     save_path=None,
+    battle_report: list[tuple[int, int, int]] | None = None,
 ) -> None:
     if save_path is not None:
         chat_room.load(str(save_path))
@@ -48,7 +50,8 @@ def run_ai_diplomacy(
         if pid not in state.active_players:
             continue
         name = f"玩家{pid}"
-        msg = diplomat.generate_message(state, chat_room, pid)
+        battle_lines = format_battle_report(state, battle_report) if battle_report else []
+        msg = diplomat.generate_message(state, chat_room, pid, battle_lines)
         if msg:
             chat_room.add_message(ChatMessage(pid, name, msg, state.turn))
             if save_path is not None:

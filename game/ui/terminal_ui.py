@@ -69,7 +69,9 @@ class TerminalGameUi(GameUiPort):
                 for pid, entry in ai_cfg.items()
                 if entry.get("diplomat", False)
             }
-        logging.basicConfig(level=logging.INFO, format="%(message)s")
+        logging.basicConfig(level=logging.WARNING, format="%(message)s")
+        logging.getLogger("httpx").setLevel(logging.WARNING)
+        logging.getLogger("httpcore").setLevel(logging.WARNING)
 
     def show_game_start(self, state: GameState) -> None:
         lines = []
@@ -85,17 +87,21 @@ class TerminalGameUi(GameUiPort):
     def wait_after_welcome(self) -> None:
         input_handler.wait_press_to_start(self._input_fn, self._out)
 
-    def show_turn_start(self, state: GameState) -> None:
+    def show_turn_start(self, state: GameState, map_path) -> None:
         display.show_turn_start(state, self._out)
+        print(f"[地图] → {map_path}", file=self._out or sys.stdout)
 
     def show_state(self, state: GameState) -> None:
         display.show_full_state(state, self._out)
 
     def show_observation(self, obs: Observation) -> None:
+        if obs.viewer_id in self._policies:
+            return
         display.show_observation(obs, self._out)
 
-    def show_turn_results(self, state: GameState) -> None:
-        display.show_turn_results(state, self._out)
+    def show_turn_results(self, state: GameState,
+                          battle_report: list[tuple[int, int, int]]) -> None:
+        display.show_turn_results(state, battle_report, self._out)
 
     def show_game_result(self, state: GameState) -> None:
         display.show_game_result(state, self._out)
@@ -115,8 +121,9 @@ class TerminalGameUi(GameUiPort):
             )
         return input_handler.collect_commands_for_player(state, player_id, self._input_fn)
 
-    def run_diplomacy(self, state: GameState, chat_room: ChatRoom, save_path=None) -> None:
+    def run_diplomacy(self, state: GameState, chat_room: ChatRoom, save_path=None,
+                      battle_report: list[tuple[int, int, int]] | None = None) -> None:
         if self._diplomats or self._policies:
             ai_game_ui.run_ai_diplomacy(
-                self._diplomats, self._policies, state, chat_room, save_path,
+                self._diplomats, self._policies, state, chat_room, save_path, battle_report,
             )

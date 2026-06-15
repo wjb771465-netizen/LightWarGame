@@ -86,9 +86,10 @@ class GameState:
                 result.append(cmd)
         return result
 
-    def apply_cmds(self, commands: List[Command]) -> None:
+    def apply_cmds(self, commands: List[Command]) -> list[tuple[int, int, int]]:
         """
         对已通过 check_cmds 的指令同时结算：每条指令聚到达（围困折半）并扣源 → Region.battle。
+        返回 owner 发生变化的地区列表：(region_id, prev_owner, new_owner)。
         """
         m = self.game_map
         incoming: Dict[int, Dict[int, int]] = defaultdict(lambda: defaultdict(int))
@@ -99,8 +100,14 @@ class GameState:
             incoming[cmd.target][cmd.player] += t
             m.regions[cmd.source].troops -= cmd.troops
 
+        changes: list[tuple[int, int, int]] = []
         for dst, by_player in incoming.items():
             total_in = sum(by_player.values())
             if total_in <= 0:
                 continue
-            m.regions[dst].battle({p: c for p, c in by_player.items() if c > 0})
+            region = m.regions[dst]
+            prev_owner = region.owner
+            region.battle({p: c for p, c in by_player.items() if c > 0})
+            if region.owner != prev_owner:
+                changes.append((dst, prev_owner, region.owner))
+        return changes
