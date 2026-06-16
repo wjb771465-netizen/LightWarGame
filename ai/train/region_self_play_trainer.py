@@ -176,7 +176,10 @@ class RegionSelfPlayTrainer(SelfPlayTrainer):
         logging.info("[RegionSelfPlay] 训练完成，模型保存至 %s", self.save_dir)
 
         for R in self.regions:
-            self.render(os.path.join(self._region_dir(R), "final"), agent_capital=R)
+            opp = random.choice([r for r in self.regions if r != R])
+            self._render_region = R
+            self.render(os.path.join(self._region_dir(R), "final"),
+                        agent_capital=R, opponent_capital=opp)
 
     # ------------------------------------------------------------------
     # Eval opponents
@@ -227,6 +230,12 @@ class RegionSelfPlayTrainer(SelfPlayTrainer):
                 wandb.log(data)
         else:
             logging.info("step=%d region=%s %s", step, region, metrics)
+
+    def _render_paths(self) -> tuple[str, str]:
+        R = self._render_region
+        base = os.path.join(self.save_dir, f"region_{R}")
+        key = f"region_{R}_eval/videos"
+        return base, key
 
     def _region_dir(self, R: int) -> str:
         return os.path.join(self.save_dir, f"region_{R}")

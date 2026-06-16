@@ -197,32 +197,37 @@ class Sb3Trainer:
     # Render
     # ------------------------------------------------------------------
 
-    def render(self, ckpt: str, agent_capital: int | None = None) -> None:
-        """训练结束后渲染一局对战视频（本地 PNG + MP4，若启用 wandb 则上传）。"""
+    def render(self, ckpt: str, agent_capital: int | None = None,
+               opponent_capital: int | None = None, max_turns: int = 60) -> None:
         if not self.args.eval_opponent:
             return
 
         from ai.algos.policy import SB3Policy
-        from ai.renders.render import _render_episode
-        from ai.renders.utils import make_video
+        from ai.envs.env import LwgEnv
+        from ai.renders.render import render as render_episodes
+
+        if self.args.wandb:
+            import wandb
 
         agent_policy = SB3Policy(path=ckpt)
         opp_types = [s.strip() for s in self.args.eval_opponent.split(",")]
-        videos = []
-        wandb_enabled = self.args.wandb
+        wandb_videos = []
 
+        base, wandb_key = self._render_paths()
         for opp_type in opp_types:
-            out_dir = os.path.join(self.save_dir, "eval_videos", opp_type)
-            _render_episode(agent_policy, self.args.scenario, 0, out_dir,
-                            opponent_spec={"type": opp_type, "player_id": 2},
-                            agent_capital=agent_capital)
-            png_dir = os.path.join(out_dir, "ep00", "png")
-            video_path = os.path.join(out_dir, "ep00", "replay.mp4")
-            make_video(png_dir, video_path, fps=4)
-            if wandb_enabled:
-                import wandb
-                videos.append(wandb.Video(video_path, caption=f"vs_{opp_type}"))
-            logging.info("[Render] vs %s → %s", opp_type, video_path)
+            env = LwgEnv(self.args.scenario)
+            env.config.game.max_turns = max_turns
+            if agent_capital is not None and opponent_capital is not None:
+                env.set_capitals(agent_capital, opponent_capital)
+            env.set_opponent({"type": opp_type, "player_id": 2})
 
-        if videos:
-            wandb.log({"eval/videos": videos})
+            out_dir = os.path.join(base, "eval_videos", opp_type)
+            video_paths = render_episodes(agent_policy, env, out_dir, 1, fps=4)
+            if self.args.wandb and video_paths:
+                wandb_videos.append(wandb.Video(video_paths[0], caption=f"vs_{opp_type}", format="mp4"))
+
+        if wandb_videos:
+            wandb.log({wandb_key: wandb_videos})
+
+    def _render_paths(self) -> tuple[str, str]:
+        return self.save_dir, "eval/videos"
