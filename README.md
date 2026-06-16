@@ -1,89 +1,53 @@
 # LightWarGame
 
-## Overview
+回合制战棋游戏，地图覆盖中国 31 个内地省级行政区。占领所有对手的首都，你就赢了。
 
-回合制战棋游戏，地图覆盖中国 31 个内地省级行政区（不含港澳台）。支持 2–6 人对战与人类/AI 混排，内置基于 MaskablePPO 的强化学习 AI。当前阶段：终端可玩，AI 训练流水线已完备。
-
-## 环境配置
+## 快速开始
 
 ```bash
 conda env create -f environment.yml
-```
-
-## 运行
-
-```bash
 conda activate chinese_war_game
 python main.py
 ```
 
-启动后：
+## 对战 Vivian
 
-1. 选择新游戏或读取存档
-2. 新游戏：输入人数（2–6）→ 选随机首都或手动指定首都
-3. 选择是否启用 AI 玩家及哪些玩家由 AI 控制
+游戏内置了一个 AI 对局 **ai_test**，启动后选 `[1] 新游戏`，再选场景 `[1] ai_test` 即可开始。
 
-### AI 对战
+对手是 **Vivian**——海外名校国际关系研究生，游戏高手，习惯叫你弟弟。她由强化学习模型驱动，每回合自动行动；如果你配置了 LLM API Key，她还会在每回合开始时发表外交言论，你可以输入回应。
 
-编辑 `ai_players.json` 设置训练好的模型路径，启动时选择对应玩家为 AI 即可：
+### 开启 Vivian 的外交功能
 
-```json
-{ "2": "saves/model.zip" }
+推荐使用[硅基流动](https://cloud.siliconflow.cn/i/Mgp8zD08)——注册即有免费额度，支持 DeepSeek-V3：
+
+```bash
+export SILICONFLOW_API_KEY=your_key_here
+python main.py
 ```
 
-AI 玩家回合自动推进，人类玩家回合正常输入指令。`obs_dim` 从模型权重自动推断，无需手动配置。
+## 基本玩法
 
-## 玩法
-
-每回合各玩家依次输入指令，格式：
+轮到你时，每条指令格式为：
 
 ```
 源地区编号,目标地区编号,兵力
 ```
 
-空行或达到本回合上限（`max(1, ceil(领地数 / 3))`，每 3 地升级）后结束输入，随后统一结算。
+例如 `5,8,10` 表示从 5 号地区向 8 号地区派出 10 名士兵。空行结束本回合。
 
-**核心规则：**
-
+**战斗规则：**
 - 只能从己方地区向相邻地区派兵，出发地至少留 1 兵
-- 出发地被敌方完全包围（孤立）时，途中兵力折半（向下取整）
-- 多方同时进入同一地区：最强者胜，剩余兵力 = 最强值 − 次强值
-- 并列最强时守方胜；守方不在并列中则该地变中立
-- 占领所有对手首都后游戏结束
-- 每回合结束后按地区增长率自动补充兵力
+- 出发地被敌方完全包围时，派出兵力途中折半
+- 同一地区多方交战：最强者胜，剩余 = 最强 − 次强；并列时守方胜，守方不在并列中则该地变中立
+- 每回合结束后各地区自动按增长率补兵
+- 每回合指令配额 = `max(1, ceil(领地数 / 3))`
 
-## 存档
+## 存档与 Session
 
-每回合结算后自动保存至 `saves/save.json`，启动时选 `[2]` 可读取。
+游戏以 **Session** 为单位管理存档。每个 Session 是 `game/campaign/sessions/<名称>/` 下的一个目录，包含 `config.yaml`（配置）和 `save.json`（存档）。
 
-## 地图
+启动时选 `[1] 新游戏`，会列出内置场景供选择；最后一项 `手动配置` 可自定义人数和首都位置。选 `[2] 读档` 则列出已有存档供继续。每回合开始前自动保存，随时可以中断继续。
 
-`data/map_configs/cn.json`，31 个省级行政区，含邻接关系与基础增长率。
+## 当前状态
 
-## 测试
-
-```bash
-conda run -n chinese_war_game python -m unittest tests.game.test_constants tests.ai.test_opponents tests.game.test_game_map tests.game.test_game_state tests.game.test_observation tests.game.test_runner tests.game.test_ui tests.ai.test_ai_encoders tests.ai.test_ai_player tests.ai.test_env tests.ai.test_rewards -v
-```
-
-## 项目结构
-
-```
-game/
-├── datatypes/       # Region, GameMap, GameState, Command, Observation
-├── ui/              # 终端显示、指令输入、地图渲染（含 AIGameUi）
-├── init_game.py     # 开局初始化（随机首都 / 指定首都 / 读档）
-├── runner.py        # 主循环
-└── save_load.py     # 存读档
-
-ai/
-├── algos/           # Policy 接口与 SB3Policy 包装
-├── envs/            # Gymnasium 环境封装、编解码、奖励函数、对手
-├── renders/         # 地图渲染与视频生成
-└── train/           # 训练脚本与配置
-
-main.py              # 终端入口（GameLauncher）
-ai_players.json      # AI 玩家模型路径配置
-data/                # 地图数据
-tests/               # 单元测试
-```
+AI 模型尚处早期阶段，策略水平有限。终端交互存在一些已知 bug（合法指令偶尔报错，重新输入一次即可），后续持续迭代中。

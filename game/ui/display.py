@@ -9,7 +9,11 @@ from game.datatypes.game_obs import Observation
 from game.datatypes.state import GameState
 
 
-def show_game_start(state: GameState, out: Optional[TextIO] = None) -> None:
+def show_game_start(
+    state: GameState,
+    out: Optional[TextIO] = None,
+    setup_info: Optional[list[str]] = None,
+) -> None:
     o = out or sys.stdout
     print(
         "\n========== 中国地图战旗 ==========\n"
@@ -23,6 +27,10 @@ def show_game_start(state: GameState, out: Optional[TextIO] = None) -> None:
         f"本局人数：{state.num_players}\n",
         file=o,
     )
+    if setup_info:
+        for line in setup_info:
+            print(line, file=o)
+        print(file=o)
 
 
 def show_turn_start(state: GameState, out: Optional[TextIO] = None) -> None:
@@ -84,10 +92,37 @@ def show_observation(obs: Observation, out: Optional[TextIO] = None) -> None:
     print("════════════════════════════════════════\n", file=o)
 
 
-def show_turn_results(state: GameState, out: Optional[TextIO] = None) -> None:
-    _ = state
+def format_battle_report(
+    state: GameState,
+    battle_report: list[tuple[int, int, int]],
+) -> list[str]:
+    lines = []
+    for rid, prev, new in battle_report:
+        region = state.game_map.regions[rid]
+        name = region.name if region is not None else f"地区{rid}"
+        if new == 0:
+            lines.append(f"{name} 回归中立")
+        elif prev == 0:
+            lines.append(f"玩家{new} 占领了 {name}")
+        else:
+            lines.append(f"玩家{new} 在 {name} 击败了 玩家{prev}")
+    return lines
+
+
+def show_turn_results(
+    state: GameState,
+    battle_report: list[tuple[int, int, int]],
+    out: Optional[TextIO] = None,
+) -> None:
     o = out or sys.stdout
-    print("（本回合战报待实现）\n", file=o)
+    print("\n── 本回合战报 ──", file=o)
+    lines = format_battle_report(state, battle_report)
+    if not lines:
+        print("  （本回合无战场变化）", file=o)
+    else:
+        for line in lines:
+            print(f"  {line}", file=o)
+    print("────────────────\n", file=o)
 
 
 def show_game_result(state: GameState, out: Optional[TextIO] = None) -> None:

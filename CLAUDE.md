@@ -7,25 +7,23 @@
 | 路径 | 用途 |
 |------|------|
 | `game/datatypes/` | 核心数据类型：Region、GameMap、GameState、Command、Observation |
-| `game/ui/` | 终端 UI（显示、地图渲染、指令输入）与 AIGameUi（AI 自动出招） |
-| `game/init_game.py` | 开局初始化（随机首都 / 指定首都 / 读档） |
+| `game/ui/` | 终端 UI（显示、地图渲染、指令输入、AI 自动出招） |
+| `game/campaign/` | 战役包：开局初始化、存读档（save_load）、聊天室（chat） |
 | `game/runner.py` | 游戏主循环：展示 → 收集指令 → 校验 → 结算 |
-| `game/save_load.py` | 存读档逻辑 |
 | `game/ui_ports.py` | UI 协议（GameUiPort），Runner 通过它解耦 UI 实现 |
+| `llm/` | LLM 外交官层：diplomat（发言）、director、base、prompts/ |
 | `ai/algos/` | Policy 接口与 SB3Policy 包装（MaskablePPO） |
 | `ai/envs/` | Gymnasium 环境封装（LwgEnv）、观测/动作编解码、奖励函数、内置对手 |
 | `ai/renders/` | 地图渲染与视频生成（帧 PNG → ffmpeg 合成为视频） |
 | `ai/train/` | 训练脚本、配置（sb3_trainer、args、YAML 配置） |
 | `main.py` | 终端入口（GameLauncher），处理启动交互与 AI 玩家绑定 |
 | `data/map_configs/` | 地图配置（cn.json：省份、邻接关系、增长率） |
-| `tests/` | 测试（game / ai / integration），详见下方 Test Conventions |
+| `tests/` | 测试（game / ai / llm / integration），详见下方 Test Conventions |
 
 ## Rules
-- AI 玩家模型路径配置在 `ai_players.json`，key 为 player_id（从 1 开始），value 为模型文件路径
+- AI 玩家配置在 session 目录下的 JSON（通过 `game/campaign/init_game.py` 的 `load_session_config()` 加载），key 为 player_id（从 1 开始），含模型路径、外交官开关、persona 等字段
 - `obs_dim` 从模型权重自动推断 `max_players`，训练后不可更改（改 max_players 需重新训练）
-- 每回合结算后自动存档至 `saves/save.json`
-- 指令配额 = `max(1, ceil(领地数 / 3))`，定义于 `game/constants.py` 的 `max_commands()`，空行或超出配额时自动结束该玩家本回合输入
-- 只从己方地区向相邻地区派兵，出发地至少留 1 兵；孤立时途中兵力折半
+- 新增运行时依赖必须同步更新 `environment.yml`（conda 依赖放顶层，pip 依赖放 `pip:` 下）
 
 ## Test Conventions
 

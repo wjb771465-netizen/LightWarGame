@@ -37,6 +37,10 @@ Thumbs.db
 
 # 存档与地图截图
 saves/
+game/campaign/sessions/*/save/
+game/campaign/sessions/manual_*/
+game/campaign/models/*
+!game/campaign/models/4.zip
 
 # 参考文件
 ref
