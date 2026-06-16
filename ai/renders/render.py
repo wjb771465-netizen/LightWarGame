@@ -8,31 +8,14 @@ from ai.envs.env import LwgEnv
 from ai.renders.utils import latest_model_dir, make_video, resolve_model_path, render_out_dir
 
 
-def _render_episode(policy: SB3Policy, scenario: str, ep: int, out_dir: str,
-                    max_turns: int | None = None,
-                    agent_capital: int | None = None,
-                    opponent_capital: int | None = None,
-                    opponent_policy: SB3Policy | None = None,
-                    opponent_spec: dict | None = None) -> tuple[int, int | None]:
+def _render_episode(policy: SB3Policy, env: LwgEnv, ep: int,
+                    out_dir: str) -> tuple[int, int | None, int]:
+    """渲染一局对战为 PNG 帧序列。env 须已由调用方配置好 capital/opponent/max_turns。"""
     png_dir = os.path.join(out_dir, f"ep{ep:02d}", "png")
     os.makedirs(png_dir, exist_ok=True)
 
-    env = LwgEnv(scenario)
-    if max_turns is not None:
-        env.config.game.max_turns = max_turns
-    if agent_capital is not None and opponent_capital is not None:
-        env.set_capitals(agent_capital, opponent_capital)
-    if opponent_spec is not None:
-        env.set_opponent(opponent_spec)
-    elif opponent_policy is not None:
-        from ai.envs.opponents import PolicyOpponent
-        env.opponent = PolicyOpponent(
-            player_id=2, policy=opponent_policy,
-            obs_encoder=env.obs_encoder, act_encoder=env.act_encoder,
-        )
     obs, _ = env.reset()
 
-    # 渲染初始状态（第 0 回合）
     turn = 0
     env.render(os.path.join(png_dir, f"turn_{turn:04d}.png"))
     prev_episode_steps = env._episode_steps
@@ -41,7 +24,6 @@ def _render_episode(policy: SB3Policy, scenario: str, ep: int, out_dir: str,
         action = policy.predict(obs, env.action_masks())
         obs, _, terminated, truncated, _ = env.step(action)
 
-        # 回合结算后或游戏结束时才渲染帧
         if env._episode_steps > prev_episode_steps or terminated or truncated:
             turn += 1
             env.render(os.path.join(png_dir, f"turn_{turn:04d}.png"))
@@ -54,22 +36,19 @@ def _render_episode(policy: SB3Policy, scenario: str, ep: int, out_dir: str,
 
 
 
-def run_render(policy: SB3Policy, scenario: str, out_dir: str, num_episodes: int, fps: int = 2,
-               max_turns: int | None = None,
-               agent_capital: int | None = None,
-               opponent_capital: int | None = None,
-               opponent_policy: SB3Policy | None = None) -> None:
+def render(policy: SB3Policy, env: LwgEnv, out_dir: str,
+           num_episodes: int = 1, fps: int = 2) -> list[str]:
+    """渲染多局对战为视频。env 须已由调用方配置好 capital/opponent/max_turns。"""
     os.makedirs(out_dir, exist_ok=True)
-
+    videos: list[str] = []
     for ep in range(num_episodes):
-        step, winner, agent_id = _render_episode(policy, scenario, ep, out_dir,
-                                                 max_turns, agent_capital, opponent_capital,
-                                                 opponent_policy)
+        step, winner, agent_id = _render_episode(policy, env, ep, out_dir)
 
         png_dir = os.path.join(out_dir, f"ep{ep:02d}", "png")
         video_path = os.path.join(out_dir, f"ep{ep:02d}", f"ep{ep:02d}.mp4")
-        if fps > 0: 
-            make_video(png_dir, video_path, fps) 
+        if fps > 0:
+            make_video(png_dir, video_path, fps)
+        videos.append(video_path)
 
         outcome = (
             "agent wins" if winner == agent_id
@@ -79,6 +58,7 @@ def run_render(policy: SB3Policy, scenario: str, out_dir: str, num_episodes: int
         logging.info("ep %02d | %d 回合 | %s → %s", ep, step, outcome, video_path)
 
     logging.info("渲染结果已保存至 %s", out_dir)
+    return videos
 
 
 def main() -> None:
@@ -109,14 +89,23 @@ def main() -> None:
         agent_path, opp_path = mp, None
 
     agent_policy = SB3Policy(path=agent_path)
+
+    env = LwgEnv(args.scenario)
+    if args.max_turns is not None:
+        env.config.game.max_turns = args.max_turns
+    if args.agent_capital is not None and args.opponent_capital is not None:
+        env.set_capitals(args.agent_capital, args.opponent_capital)
+
     opp_policy = SB3Policy(path=opp_path) if opp_path else None
+    if opp_policy is not None:
+        from ai.envs.opponents import PolicyOpponent
+        env.opponent = PolicyOpponent(
+            player_id=2, policy=opp_policy,
+            obs_encoder=env.obs_encoder, act_encoder=env.act_encoder,
+        )
 
     out_dir = render_out_dir(args.scenario)
-    run_render(agent_policy, args.scenario, out_dir, args.episodes, args.fps,
-               max_turns=args.max_turns,
-               agent_capital=args.agent_capital,
-               opponent_capital=args.opponent_capital,
-               opponent_policy=opp_policy)
+    render(agent_policy, env, out_dir, args.episodes, args.fps)
 
 
 if __name__ == "__main__":
