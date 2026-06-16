@@ -38,7 +38,7 @@ class PlaceholderGameUi(GameUiPort):
     def wait_after_welcome(self) -> None:
         pass
 
-    def show_turn_start(self, state: GameState) -> None:
+    def show_turn_start(self, state: GameState, map_path: Path) -> None:
         pass
 
     def show_state(self, state: GameState) -> None:
