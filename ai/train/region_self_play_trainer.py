@@ -175,6 +175,9 @@ class RegionSelfPlayTrainer(SelfPlayTrainer):
             agents[R].save(os.path.join(self._region_dir(R), "final"))
         logging.info("[RegionSelfPlay] 训练完成，模型保存至 %s", self.save_dir)
 
+        for R in self.regions:
+            self.render(os.path.join(self._region_dir(R), "final"), agent_capital=R)
+
     # ------------------------------------------------------------------
     # Eval opponents
     # ------------------------------------------------------------------

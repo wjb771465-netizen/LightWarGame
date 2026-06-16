@@ -134,11 +134,30 @@ class Sb3Trainer:
 
     def _fixed_opponent_specs(self, eval_n_envs: int, opponent_id: int) -> list[dict]:
         opp_types = [s.strip() for s in self.args.eval_opponent.split(",")]
-        per_type = max(1, eval_n_envs // len(opp_types))
-        specs = []
-        for t in opp_types:
-            specs.extend([{"type": t, "player_id": opponent_id}] * per_type)
-        return specs[:eval_n_envs]
+        n_types = len(opp_types)
+
+        if n_types > eval_n_envs:
+            picked = random.sample(opp_types, eval_n_envs)
+            logging.warning(
+                "[Eval] 固定对手类型数(%d) > eval 进程数(%d)，随机选 %d 种: %s",
+                n_types, eval_n_envs, eval_n_envs, picked,
+            )
+            return [{"type": t, "player_id": opponent_id} for t in picked]
+
+        if n_types < eval_n_envs:
+            logging.warning(
+                "[Eval] 固定对手类型数(%d) < eval 进程数(%d)，循环填充至 %d",
+                n_types, eval_n_envs, eval_n_envs,
+            )
+            specs = []
+            i = 0
+            while len(specs) < eval_n_envs:
+                specs.append({"type": opp_types[i % n_types], "player_id": opponent_id})
+                i += 1
+            return specs
+
+        # n_types == eval_n_envs
+        return [{"type": t, "player_id": opponent_id} for t in opp_types]
 
     def _opponent_id(self, env) -> int:
         agent_id: int = env.get_attr("agent_id")[0]
@@ -178,12 +197,11 @@ class Sb3Trainer:
     # Render
     # ------------------------------------------------------------------
 
-    def render(self, ckpt: str) -> None:
-        """训练结束后渲染一局对战视频到 W&B（每种固定对手一局）。"""
-        if not self.args.wandb or not self.args.eval_opponent:
+    def render(self, ckpt: str, agent_capital: int | None = None) -> None:
+        """训练结束后渲染一局对战视频（本地 PNG + MP4，若启用 wandb 则上传）。"""
+        if not self.args.eval_opponent:
             return
 
-        import wandb
         from ai.algos.policy import SB3Policy
         from ai.renders.render import _render_episode
         from ai.renders.utils import make_video
@@ -191,15 +209,19 @@ class Sb3Trainer:
         agent_policy = SB3Policy(path=ckpt)
         opp_types = [s.strip() for s in self.args.eval_opponent.split(",")]
         videos = []
+        wandb_enabled = self.args.wandb
 
         for opp_type in opp_types:
             out_dir = os.path.join(self.save_dir, "eval_videos", opp_type)
             _render_episode(agent_policy, self.args.scenario, 0, out_dir,
-                            opponent_spec={"type": opp_type, "player_id": 2})
+                            opponent_spec={"type": opp_type, "player_id": 2},
+                            agent_capital=agent_capital)
             png_dir = os.path.join(out_dir, "ep00", "png")
             video_path = os.path.join(out_dir, "ep00", "replay.mp4")
             make_video(png_dir, video_path, fps=4)
-            videos.append(wandb.Video(video_path, caption=f"vs_{opp_type}"))
+            if wandb_enabled:
+                import wandb
+                videos.append(wandb.Video(video_path, caption=f"vs_{opp_type}"))
             logging.info("[Render] vs %s → %s", opp_type, video_path)
 
         if videos:
