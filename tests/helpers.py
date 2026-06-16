@@ -22,6 +22,7 @@ def map_with_regions(regions):
     """构造 GameMap，绕过配置加载直接注入 regions 列表（index 0 为 None，1-indexed）。"""
     m = GameMap.__new__(GameMap)
     m.regions = regions
+    m.capitals = []
     return m
 
 

@@ -3,7 +3,9 @@ ai/train/sb3_trainer.py 的单元测试。
 
 验证：MaskablePPO 能跑通短训练、args 字段可读、checkpoint 能写入磁盘。
 """
+import logging
 import os
+import random
 import tempfile
 import unittest
 
@@ -111,3 +113,60 @@ class TestSelfPlayArgs(unittest.TestCase):
         parser = get_config()
         args = parser.parse_args(["--scenario", "duel/selfplay", "--self-play"])
         self.assertEqual(args.self_play_pool_size, 20)
+
+
+class TestFixedOpponentSpecs(unittest.TestCase):
+    """_fixed_opponent_specs 边界行为测试。"""
+
+    def setUp(self):
+        from argparse import Namespace
+        self.args = Namespace(
+            scenario="duel/vsbaseline",
+            seed=42,
+            eval_opponent="random,rule,fsm",
+        )
+        self.args.save_dir = tempfile.mkdtemp()
+
+    def tearDown(self):
+        import shutil
+        shutil.rmtree(self.args.save_dir, ignore_errors=True)
+
+    def _make_trainer(self, eval_opponent: str):
+        from ai.train.sb3_trainer import Sb3Trainer
+        self.args.eval_opponent = eval_opponent
+        return Sb3Trainer(self.args)
+
+    def test_types_equal_envs_one_to_one(self):
+        """类型数 == 进程数：一一对应。"""
+        trainer = self._make_trainer("random,rule")
+        with self.assertNoLogs(level=logging.WARNING):
+            specs = trainer._fixed_opponent_specs(2, opponent_id=2)
+        self.assertEqual(len(specs), 2)
+        self.assertEqual([s["type"] for s in specs], ["random", "rule"])
+
+    def test_types_more_than_envs_random_sample(self):
+        """类型数 > 进程数：random.sample 随机选，warning 列出入选类型。"""
+        trainer = self._make_trainer("random,rule,fsm")
+        random.seed(99)
+        with self.assertLogs(level=logging.WARNING) as ctx:
+            specs = trainer._fixed_opponent_specs(2, opponent_id=2)
+        self.assertEqual(len(specs), 2)
+        self.assertIn("随机选 2 种", ctx.output[0])
+        # 用同一 seed 验证确定性
+        random.seed(99)
+        specs2 = trainer._fixed_opponent_specs(2, opponent_id=2)
+        self.assertEqual([s["type"] for s in specs], [s["type"] for s in specs2])
+        # 选中的都属于原集合
+        for s in specs:
+            self.assertIn(s["type"], ("random", "rule", "fsm"))
+
+    def test_types_fewer_than_envs_cycle_fill(self):
+        """类型数 < 进程数：循环填充至满，warning 输出。"""
+        trainer = self._make_trainer("random,rule")
+        with self.assertLogs(level=logging.WARNING) as ctx:
+            specs = trainer._fixed_opponent_specs(5, opponent_id=2)
+        self.assertEqual(len(specs), 5)
+        self.assertIn("循环填充至 5", ctx.output[0])
+        # 前 4 个是两轮 cycle
+        self.assertEqual([s["type"] for s in specs[:4]],
+                         ["random", "rule", "random", "rule"])

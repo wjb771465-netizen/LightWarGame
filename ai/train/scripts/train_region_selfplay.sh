@@ -29,8 +29,9 @@ conda run --no-capture-output -n chinese_war_game \
   --pool-sampling-strategy progress \
   --use-eval \
   --eval-episodes          20 \
-  --eval-opponent          random,rule \
+  --eval-opponent          random,rule,fsm \
   --eval-opponent-freq     20 \
+  --eval-n-envs             6 \
   --total-timesteps        5000000 \
   --n-steps                2048 \
   --batch-size             512 \
