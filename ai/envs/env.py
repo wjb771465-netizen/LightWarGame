@@ -14,7 +14,7 @@ from game.campaign.init_game import fixed_capitals, random_capitals
 from ai.algos.policy import SB3Policy
 from ai.envs.action import ActionEncoder
 from ai.envs.observation import ObservationEncoder
-from ai.envs.opponents import PolicyOpponent, RandomOpponent, RuleOpponent
+from ai.envs.opponents import FsmOpponent, PolicyOpponent, RandomOpponent, RuleOpponent
 from ai.envs.opponents.base_opponent import BaseOpponent
 from ai.envs.rewards import build_reward_functions
 from ai.envs.rewards.reward_function_base import BaseRewardFunction
@@ -161,6 +161,8 @@ class LwgEnv(gym.Env):
             self.opponent = RandomOpponent(player_id=spec["player_id"])
         elif spec["type"] == "rule":
             self.opponent = RuleOpponent(player_id=spec["player_id"])
+        elif spec["type"] == "fsm":
+            self.opponent = FsmOpponent(player_id=spec["player_id"])
         elif spec["type"] == "policy":
             self.opponent = PolicyOpponent(
                 player_id=spec["player_id"],
@@ -186,6 +188,8 @@ class LwgEnv(gym.Env):
             return RandomOpponent(player_id=opponent_id)
         if opp_type == "rule":
             return RuleOpponent(player_id=opponent_id)
+        if opp_type == "fsm":
+            return FsmOpponent(player_id=opponent_id)
         if opp_type == "policy":
             return PolicyOpponent(
                 player_id=opponent_id,

@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import logging
 import sys
 from pathlib import Path
 from typing import Any, Callable, List, Optional, TextIO
@@ -23,16 +22,14 @@ class TerminalGameUi(GameUiPort):
     ) -> None:
         self._input_fn = input_fn
         self._out = out
-        self._policies: dict[int, Any] = {}
-        self._obs_enc: Any = None
-        self._act_enc: Any = None
+        self._opponents: dict[int, Any] = {}
         self._log_path: Optional[Path] = None
         self._diplomats: dict[int, Any] = {}
         self._ai_cfg: dict[int, Any] = {}
 
     @property
     def has_ai_players(self) -> bool:
-        return bool(self._policies)
+        return bool(self._ai_cfg)
 
     def ask_launch(self) -> tuple[Path, bool]:
         o = self._out or sys.stdout
@@ -50,30 +47,12 @@ class TerminalGameUi(GameUiPort):
         from game.campaign.init_game import load_session_config
         ai_cfg = {int(k): v for k, v in load_session_config(session_dir).get("ai_players", {}).items()}
         if ai_cfg:
-            self._load_ai_setup(ai_cfg)
+            self._ai_cfg = ai_cfg
         return session_dir, is_new
 
-    def _load_ai_setup(self, ai_cfg: dict) -> None:
-        from game.campaign.init_game import SESSIONS_DIR
-        from ai.algos.policy import SB3Policy
-        self._ai_cfg = ai_cfg
-        self._policies = {
-            pid: SB3Policy(path=str(SESSIONS_DIR.parent / entry["model"]))
-            for pid, entry in ai_cfg.items()
-        }
-        if any(e.get("diplomat") for e in ai_cfg.values()):
-            from llm.diplomat import LLMDiplomat
-            from llm.prompts import build_diplomat_system_prompt
-            self._diplomats = {
-                pid: LLMDiplomat(system_prompt=build_diplomat_system_prompt(entry.get("persona", "default")))
-                for pid, entry in ai_cfg.items()
-                if entry.get("diplomat", False)
-            }
-        logging.basicConfig(level=logging.WARNING, format="%(message)s")
-        logging.getLogger("httpx").setLevel(logging.WARNING)
-        logging.getLogger("httpcore").setLevel(logging.WARNING)
-
     def show_game_start(self, state: GameState) -> None:
+        if self._ai_cfg:
+            self._opponents, self._diplomats = ai_game_ui.setup_ai(self._ai_cfg, state.game_map)
         lines = []
         for pid, entry in self._ai_cfg.items():
             name = entry.get("name", f"玩家{pid}")
@@ -95,7 +74,7 @@ class TerminalGameUi(GameUiPort):
         display.show_full_state(state, self._out)
 
     def show_observation(self, obs: Observation) -> None:
-        if obs.viewer_id in self._policies:
+        if obs.viewer_id in self._ai_cfg:
             return
         display.show_observation(obs, self._out)
 
@@ -107,23 +86,15 @@ class TerminalGameUi(GameUiPort):
         display.show_game_result(state, self._out)
 
     def collect_commands(self, state: GameState, player_id: int) -> List[Command]:
-        if player_id in self._policies:
-            if self._act_enc is None:
-                from ai.envs.action import ActionEncoder
-                self._act_enc = ActionEncoder(state.game_map)
-            if self._obs_enc is None:
-                from ai.envs.observation import ObservationEncoder
-                num_regions = len(state.game_map.regions) - 1
-                max_players = (next(iter(self._policies.values())).obs_dim - 2) // num_regions - 6
-                self._obs_enc = ObservationEncoder(state.game_map, max_players)
+        if player_id in self._opponents:
             return ai_game_ui.collect_ai_commands(
-                self._policies, self._obs_enc, self._act_enc, self._log_path, state, player_id,
+                self._opponents, self._log_path, state, player_id,
             )
         return input_handler.collect_commands_for_player(state, player_id, self._input_fn)
 
     def run_diplomacy(self, state: GameState, chat_room: ChatRoom, save_path=None,
                       battle_report: list[tuple[int, int, int]] | None = None) -> None:
-        if self._diplomats or self._policies:
+        if self._diplomats or self._opponents:
             ai_game_ui.run_ai_diplomacy(
-                self._diplomats, self._policies, state, chat_room, save_path, battle_report,
+                self._diplomats, set(self._opponents.keys()), state, chat_room, save_path, battle_report,
             )

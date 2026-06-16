@@ -3,6 +3,7 @@ num_players: 2
 capitals: [20, 4]
 ai_players:
   2:
+    type: policy
     model: models/4.zip
     persona: queen
     diplomat: true

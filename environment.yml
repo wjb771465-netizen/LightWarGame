@@ -16,3 +16,4 @@ dependencies:             # 需要安装的包列表
     - sb3-contrib
     - wandb
     - tensorboard
+    - openai

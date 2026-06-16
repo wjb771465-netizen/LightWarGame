@@ -1,8 +1,6 @@
 import unittest
 from unittest.mock import MagicMock, patch
 
-import numpy as np
-
 from game.datatypes.command import Command
 from game.datatypes.game_map import Region
 from game.datatypes.state import GameState
@@ -16,55 +14,48 @@ def _make_state():
     return GameState(map_with_regions([None, a, b]), num_players=2)
 
 
-def _make_ui(policies):
-    obs_enc = MagicMock()
-    obs_enc.encode.return_value = np.zeros(10, dtype=np.float32)
-    act_enc = MagicMock()
-    act_enc.mask.return_value = np.ones(5, dtype=bool)
+def _make_ui(opponents):
     ui = TerminalGameUi()
-    ui._policies = policies
-    ui._obs_enc = obs_enc
-    ui._act_enc = act_enc
-    return ui, obs_enc, act_enc
+    ui._opponents = opponents
+    ui._ai_cfg = {pid: {} for pid in opponents}
+    return ui
 
 
 class TestAIGameUi(unittest.TestCase):
 
     def test_ai_returns_command(self):
-        """AI 玩家：policy 返回有效 action → collect_commands 返回非空 Command 列表。"""
+        """AI 玩家：opponent.act 返回 Command 列表 → collect_commands 直接返回。"""
         state = _make_state()
         expected_cmd = Command(source=2, target=1, troops=5, player=2)
 
-        policy = MagicMock()
-        policy.predict.return_value = 3
-        ui, _, act_enc = _make_ui({2: policy})
-        act_enc.decode.return_value = expected_cmd
+        opponent = MagicMock()
+        opponent.act.return_value = [expected_cmd]
+        ui = _make_ui({2: opponent})
 
         result = ui.collect_commands(state, player_id=2)
 
         self.assertEqual(result, [expected_cmd])
-        policy.predict.assert_called_once()
+        opponent.act.assert_called_once_with(state)
 
     def test_human_player_delegates_terminal(self):
-        """非 AI 玩家：collect_commands 委托给 input_handler，不触发 policy。"""
+        """非 AI 玩家：collect_commands 委托给 input_handler，不触发 opponent。"""
         state = _make_state()
-        policy = MagicMock()
-        ui, _, _ = _make_ui({2: policy})
+        opponent = MagicMock()
+        ui = _make_ui({2: opponent})
 
         with patch("game.ui.input_handler.collect_commands_for_player", return_value=[]) as mock:
             result = ui.collect_commands(state, player_id=1)
             mock.assert_called_once_with(state, 1, None)
 
-        policy.predict.assert_not_called()
+        opponent.act.assert_not_called()
         self.assertEqual(result, [])
 
-    def test_noop_action_returns_empty(self):
-        """policy 返回 0（no-op）→ decode 返回 None → collect_commands 返回 []。"""
+    def test_opponent_returns_empty(self):
+        """opponent.act 返回 [] → collect_commands 返回 []。"""
         state = _make_state()
-        policy = MagicMock()
-        policy.predict.return_value = 0
-        ui, _, act_enc = _make_ui({2: policy})
-        act_enc.decode.return_value = None
+        opponent = MagicMock()
+        opponent.act.return_value = []
+        ui = _make_ui({2: opponent})
 
         result = ui.collect_commands(state, player_id=2)
 

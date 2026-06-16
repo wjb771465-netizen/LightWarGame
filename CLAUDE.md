@@ -23,9 +23,7 @@
 ## Rules
 - AI 玩家配置在 session 目录下的 JSON（通过 `game/campaign/init_game.py` 的 `load_session_config()` 加载），key 为 player_id（从 1 开始），含模型路径、外交官开关、persona 等字段
 - `obs_dim` 从模型权重自动推断 `max_players`，训练后不可更改（改 max_players 需重新训练）
-- 每回合结算后自动存档至 `saves/save.json`
-- 指令配额 = `max(1, ceil(领地数 / 3))`，定义于 `game/constants.py` 的 `max_commands()`，空行或超出配额时自动结束该玩家本回合输入
-- 只从己方地区向相邻地区派兵，出发地至少留 1 兵；孤立时途中兵力折半
+- 新增运行时依赖必须同步更新 `environment.yml`（conda 依赖放顶层，pip 依赖放 `pip:` 下）
 
 ## Test Conventions
 

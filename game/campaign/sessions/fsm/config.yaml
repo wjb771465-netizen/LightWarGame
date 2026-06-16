@@ -1,0 +1,10 @@
+name: "rule_test"
+num_players: 2
+capitals: [20, 4]
+ai_players:
+  2:
+    type: fsm
+    persona: default
+    diplomat: true
+    name: Tom
+    intro: 退伍侦察兵，信奉进攻是最好的防守，对战场局势有野兽般的直觉。
