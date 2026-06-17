@@ -53,10 +53,14 @@ class RegionSelfPlayTrainer(SelfPlayTrainer):
             self._agent_elos[R] = 1200.0
 
     def _opponent_id(self) -> int:
-        env = self.envs[self._regions[0]]
-        agent_id: int = env.get_attr("agent_id")[0]
-        num_players: int = env.get_attr("config")[0].game.num_players
-        return next(p for p in range(1, num_players + 1) if p != agent_id)
+        # 所有 env 共享同一 YAML 配置，agent_id 相同，读一次缓存即可。
+        # 这里用第一个 region 的 env 只在 __init__ 阶段的单线程安全窗口内读取。
+        if not hasattr(self, "_cached_opponent_id"):
+            env = self.envs[self._regions[0]]
+            agent_id: int = env.get_attr("agent_id")[0]
+            num_players: int = env.get_attr("config")[0].game.num_players
+            self._cached_opponent_id = next(p for p in range(1, num_players + 1) if p != agent_id)
+        return self._cached_opponent_id
 
     # ------------------------------------------------------------------
     # Opponent sampling (region-aware override)
