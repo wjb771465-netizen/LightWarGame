@@ -61,13 +61,30 @@ class Sb3Trainer:
     def create_env(self) -> VecEnv:
         scenario = self.args.scenario
 
-        def _make_env():
-            import faulthandler, sys
-            faulthandler.enable(file=sys.stderr)
-            return LwgEnv(scenario)
+        def _wrap_env():
+            import sys, traceback as _tb
+            env = LwgEnv(scenario)
+            # 给所有 Gym API 方法包一层异常捕获，确保 traceback 进 stderr
+            for _attr in ("step", "reset", "action_masks", "render", "close",
+                          "set_opponent", "set_capitals"):
+                _orig = getattr(env, _attr, None)
+                if _orig is None:
+                    continue
+                def _safe(method=_orig, name=_attr):
+                    def _wrapper(*a, **kw):
+                        try:
+                            return method(*a, **kw)
+                        except Exception:
+                            print(f"[SubprocEnv] {name} crashed:", file=sys.stderr, flush=True)
+                            _tb.print_exc(file=sys.stderr)
+                            sys.stderr.flush()
+                            raise
+                    return _wrapper
+                setattr(env, _attr, _safe())
+            return env
 
         return VecMonitor(
-            make_vec_env(_make_env, n_envs=self.args.n_envs,
+            make_vec_env(_wrap_env, n_envs=self.args.n_envs,
                          vec_env_cls=SubprocVecEnv, monitor_kwargs=None),
             info_keywords=("win", "turn"),
         )
