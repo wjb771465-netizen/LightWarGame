@@ -24,15 +24,16 @@ conda run --no-capture-output -n chinese_war_game \
   --save-dir               "$SAVE_DIR" \
   --region-self-play \
   --region-self-play-regions 4,20 \
-  --self-play-pool-size    20 \
+  --self-play-pool-size    100 \
   --self-play-initial-opponent rule \
   --pool-sampling-strategy progress \
   --use-eval \
   --eval-episodes          20 \
   --eval-opponent          random,rule,fsm \
+  --eval-n-envs             6 \
   --eval-opponent-freq     20 \
   --eval-n-envs             6 \
-  --total-timesteps        10000000 \
+  --total-timesteps        5000000 \
   --n-steps                2048 \
   --batch-size             512 \
   --n-epochs               10 \
@@ -40,8 +41,9 @@ conda run --no-capture-output -n chinese_war_game \
   --gamma                  0.99 \
   --gae-lambda             0.97 \
   --clip-range             0.2 \
-  --net-arch               512 512 256 \
-  --checkpoint-freq        50000 \
+  --use-adj \
+  --net-arch               256 256 \
+  --checkpoint-freq        16384 \
   --win-rate-window        200 \
   --seed                   42 \
   --parallel-regions       2 \

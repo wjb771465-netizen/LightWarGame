@@ -55,8 +55,9 @@ class Sb3Trainer:
 
     def create_env(self) -> VecEnv:
         scenario = self.args.scenario
+        use_adj = getattr(self.args, "use_adj", False)
         return VecMonitor(
-            make_vec_env(lambda: LwgEnv(scenario), n_envs=self.args.n_envs, vec_env_cls=SubprocVecEnv, monitor_kwargs=None),
+            make_vec_env(lambda: LwgEnv(scenario, use_adjacency=use_adj), n_envs=self.args.n_envs, vec_env_cls=SubprocVecEnv, monitor_kwargs=None),
             info_keywords=("win", "turn"),
         )
 
@@ -212,10 +213,11 @@ class Sb3Trainer:
         agent_policy = SB3Policy(path=ckpt)
         opp_types = [s.strip() for s in self.args.eval_opponent.split(",")]
         wandb_videos = []
+        use_adj = getattr(self.args, "use_adj", False)
 
         base, wandb_key = self._render_paths()
         for opp_type in opp_types:
-            env = LwgEnv(self.args.scenario)
+            env = LwgEnv(self.args.scenario, use_adjacency=use_adj)
             env.config.game.max_turns = max_turns
             if agent_capital is not None and opponent_capital is not None:
                 env.set_capitals(agent_capital, opponent_capital)

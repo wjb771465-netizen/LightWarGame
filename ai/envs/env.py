@@ -31,7 +31,8 @@ class LwgEnv(gym.Env):
         mask = env.action_masks()
     """
 
-    def __init__(self, config_name: str, agent_id: int = 1) -> None:
+    def __init__(self, config_name: str, agent_id: int = 1,
+                 use_adjacency: bool = False) -> None:
         self.config = parse_config(config_name)
         self.agent_id = agent_id
 
@@ -42,6 +43,7 @@ class LwgEnv(gym.Env):
             max_troops=self.config.observation.max_troops,
             max_growth=self.config.observation.max_growth,
             cmd_max=self.config.observation.cmd_max,
+            use_adjacency=use_adjacency,
         )
         self.act_encoder = ActionEncoder(
             game_map,
