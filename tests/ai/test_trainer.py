@@ -37,12 +37,12 @@ class TestMaskablePPOIntegration(unittest.TestCase):
 
     def test_args_scenario_parsed(self):
         """get_config 解析 --scenario 后，save_dir 默认含 ai/train/results/<scenario>/run_ 前缀。"""
-        from ai.train.sb3_trainer import _resolve_save_dir
+        from ai.train.utils import resolve_save_dir
         parser = get_config()
         args = parser.parse_args(["--scenario", SCENARIO])
         self.assertEqual(args.scenario, SCENARIO)
         self.assertIsNone(args.save_dir)
-        resolved = _resolve_save_dir(args)
+        resolved = resolve_save_dir(args.scenario, args.save_dir)
         expected_prefix = os.path.join("ai", "train", "results", SCENARIO, "run_")
         self.assertTrue(resolved.startswith(expected_prefix), resolved)
 
@@ -123,6 +123,8 @@ class TestFixedOpponentSpecs(unittest.TestCase):
         self.args = Namespace(
             scenario="duel/vsbaseline",
             seed=42,
+            n_envs=1,
+            win_rate_window=100,
             eval_opponent="random,rule,fsm",
         )
         self.args.save_dir = tempfile.mkdtemp()
@@ -132,9 +134,17 @@ class TestFixedOpponentSpecs(unittest.TestCase):
         shutil.rmtree(self.args.save_dir, ignore_errors=True)
 
     def _make_trainer(self, eval_opponent: str):
+        from unittest.mock import patch
         from ai.train.sb3_trainer import Sb3Trainer
         self.args.eval_opponent = eval_opponent
-        return Sb3Trainer(self.args)
+        # Sb3Trainer.__init__ 会调用 create_env()/create_agent()，
+        # 但 _fixed_opponent_specs 测试不需要它们 → mock 掉
+        with patch.object(Sb3Trainer, "create_env", return_value=None), \
+             patch.object(Sb3Trainer, "create_agent", return_value=None):
+            trainer = Sb3Trainer(self.args)
+            trainer.env = None  # create_env mock 返回了 None
+            trainer.agent = None
+        return trainer
 
     def test_types_equal_envs_one_to_one(self):
         """类型数 == 进程数：一一对应。"""
