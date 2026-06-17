@@ -116,10 +116,9 @@ class Sb3Trainer:
                     edge_index=edge_index,
                     hidden_channels=self.args.gnn_hidden_channels,
                 ),
-                net_arch=[],
             )
-        else:
-            policy_kwargs["net_arch"] = self.args.net_arch
+
+        policy_kwargs["net_arch"] = self.args.net_arch
 
         return SB3Policy(env=env, args=self.args, policy_kwargs=policy_kwargs,
                          tb_log_dir=tb_log_dir)

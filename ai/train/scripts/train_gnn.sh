@@ -23,6 +23,7 @@ conda run --no-capture-output -n chinese_war_game \
   --exp-name               "$EXP_NAME" \
   --save-dir               "$SAVE_DIR" \
   --use-gnn \
+  --net-arch               128 \
   --gnn-hidden-channels    128 \
   --total-timesteps        5000000 \
   --n-steps                2048 \
