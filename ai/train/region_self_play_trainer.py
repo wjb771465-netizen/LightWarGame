@@ -16,7 +16,8 @@ from ai.train.utils import (
     checkpoint_path,
     extract_ckpt_step,
     final_model_path,
-    region_dir,
+    resolve_save_dir,
+    set_seeds,
 )
 
 
@@ -24,7 +25,10 @@ class RegionSelfPlayTrainer(SelfPlayTrainer):
     """每个地区维护独立模型，支持多线程并行训练，对手从地区策略池中随机抽取。"""
 
     def __init__(self, args) -> None:
-        super().__init__(args)
+        self.args = args
+        self.save_dir = resolve_save_dir(args.scenario, args.save_dir)
+        set_seeds(args.seed)
+
         raw = getattr(args, "region_self_play_regions", None)
         self._regions: list[int] = (
             list(range(1, 32)) if raw is None
@@ -34,16 +38,17 @@ class RegionSelfPlayTrainer(SelfPlayTrainer):
         self._log_lock = threading.Lock()
         torch.set_num_threads(args.n_training_threads)
 
-        # 每个地区独立的 env / agent / win_cb / elo
-        self._envs: dict[int, object] = {}
-        self._agents: dict[int, SB3Policy] = {}
+        self.save_dirs: dict[int, str] = {}
+        self.envs: dict[int, object] = {}
+        self.agents: dict[int, SB3Policy] = {}
         self._win_cbs: dict[int, WinRateCallback] = {}
         self._agent_elos: dict[int, float] = {}
 
         for R in self._regions:
-            os.makedirs(region_dir(self.save_dir, R), exist_ok=True)
-            self._envs[R] = self.create_env()
-            self._agents[R] = self.create_agent(self._envs[R])
+            self.save_dirs[R] = os.path.join(self.save_dir, f"region_{R}")
+            os.makedirs(self.save_dirs[R], exist_ok=True)
+            self.envs[R] = self.create_env()
+            self.agents[R] = self.create_agent(self.envs[R], tb_log_dir=self.save_dirs[R])
             self._win_cbs[R] = WinRateCallback(window=self.args.win_rate_window)
             self._agent_elos[R] = 1200.0
 
@@ -95,7 +100,7 @@ class RegionSelfPlayTrainer(SelfPlayTrainer):
         chunk = self.args.checkpoint_freq
 
         while True:
-            active = [R for R in self._regions if self._agents[R].num_timesteps < total]
+            active = [R for R in self._regions if self.agents[R].num_timesteps < total]
             if not active:
                 break
 
@@ -107,8 +112,8 @@ class RegionSelfPlayTrainer(SelfPlayTrainer):
 
             # Phase 2: train all regions in parallel
             def _train_chunk(R: int) -> None:
-                agent = self._agents[R]
-                env = self._envs[R]
+                agent = self.agents[R]
+                env = self.envs[R]
                 win_cb = self._win_cbs[R]
                 specs = round_specs[R]
                 steps = min(chunk, total - agent.num_timesteps)
@@ -138,7 +143,7 @@ class RegionSelfPlayTrainer(SelfPlayTrainer):
                 agent._model._custom_logger = True
                 step = agent.num_timesteps
 
-                ckpt = checkpoint_path(region_dir(self.save_dir, R), step)
+                ckpt = checkpoint_path(self.save_dirs[R], step)
                 agent.save(ckpt)
 
                 ckpt_zip = ckpt + ".zip"
@@ -168,15 +173,14 @@ class RegionSelfPlayTrainer(SelfPlayTrainer):
             self.pool.save(os.path.join(self.save_dir, "pool_state.json"))
 
         for R in self._regions:
-            final = final_model_path(region_dir(self.save_dir, R))
-            self._agents[R].save(final)
+            final = final_model_path(self.save_dirs[R])
+            self.agents[R].save(final)
         logging.info("[RegionSelfPlay] 训练完成，模型保存至 %s", self.save_dir)
 
         for R in self._regions:
             opp = random.choice([r for r in self._regions if r != R])
-            self._render_region = R
-            self.render(final_model_path(region_dir(self.save_dir, R)),
-                        agent_capital=R, opponent_capital=opp)
+            self.render(final_model_path(self.save_dirs[R]),
+                        save_dir=self.save_dirs[R], agent_capital=R, opponent_capital=opp)
 
     # ------------------------------------------------------------------
     # Eval opponents
@@ -227,9 +231,3 @@ class RegionSelfPlayTrainer(SelfPlayTrainer):
                 wandb.log(data)
         else:
             logging.info("step=%d region=%s %s", step, region, metrics)
-
-    def _render_paths(self) -> tuple[str, str]:
-        R = self._render_region
-        base = region_dir(self.save_dir, R)
-        key = f"region_{R}_eval/videos"
-        return base, key

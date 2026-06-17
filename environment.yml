@@ -17,3 +17,4 @@ dependencies:             # 需要安装的包列表
     - wandb
     - tensorboard
     - openai
+    - torch_geometric

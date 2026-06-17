@@ -14,6 +14,7 @@ from ai.train.utils import (
     checkpoint_path,
     final_model_path,
     format_eval_specs,
+    render_paths,
     resolve_save_dir,
     set_seeds,
 )
@@ -27,7 +28,7 @@ class Sb3Trainer:
         os.makedirs(self.save_dir, exist_ok=True)
         set_seeds(args.seed)
         self.env = self.create_env()
-        self.agent = self.create_agent(self.env)
+        self.agent = self.create_agent(self.env, tb_log_dir=self.save_dir)
         self._win_cb = WinRateCallback(window=self.args.win_rate_window)
 
     # ------------------------------------------------------------------
@@ -36,12 +37,13 @@ class Sb3Trainer:
 
     def train(self) -> None:
         self._init_logging()
+
         total = self.args.total_timesteps
         chunk = self.args.checkpoint_freq
         while self.agent.num_timesteps < total:
             steps = min(chunk, total - self.agent.num_timesteps)
             self.agent.learn(steps, callback=[self._win_cb])
-            self.agent._model._custom_logger = True  # 复用 SummaryWriter，避免多 tfevents 文件
+            self.agent._model._custom_logger = True
             step = self.agent.num_timesteps
             ckpt = checkpoint_path(self.save_dir, step)
             self.agent.save(ckpt)
@@ -50,7 +52,7 @@ class Sb3Trainer:
         final = final_model_path(self.save_dir)
         self.agent.save(final)
         logging.info("模型已保存至 %s/final.zip", self.save_dir)
-        self.render(final)
+        self.render(final, save_dir=self.save_dir)
 
     # ------------------------------------------------------------------
     # Env / Agent factories
@@ -64,11 +66,11 @@ class Sb3Trainer:
             info_keywords=("win", "turn"),
         )
 
-    def create_agent(self, env: VecEnv) -> SB3Policy:
+    def create_agent(self, env: VecEnv, tb_log_dir: str) -> SB3Policy:
         resume = getattr(self.args, "resume_from", None)
         if resume:
             return SB3Policy(path=resume, env=env)
-        return SB3Policy(env=env, args=self.args, tb_log_dir=self.save_dir)
+        return SB3Policy(env=env, args=self.args, tb_log_dir=tb_log_dir)
 
     # ------------------------------------------------------------------
     # Eval
@@ -92,7 +94,6 @@ class Sb3Trainer:
         results = evaluate(ckpt, specs, self.args.scenario, self.args.eval_episodes,
                            agent_capital=region)
 
-        # 每种固定对手单独出指标
         by_type: dict[str, list] = {}
         for r in results:
             t = r.opponent_spec["type"]
@@ -145,7 +146,6 @@ class Sb3Trainer:
                 i += 1
             return specs
 
-        # n_types == eval_n_envs
         return [{"type": t, "player_id": opponent_id} for t in opp_types]
 
     def _opponent_id(self) -> int:
@@ -158,7 +158,6 @@ class Sb3Trainer:
     # ------------------------------------------------------------------
 
     def log_eval_metrics(self, metrics: dict, step: int, region: int | None = None) -> None:
-        """记录 eval 指标到 W&B（训练指标走 TensorBoard sync，不在此重复）。"""
         if self.args.wandb:
             import wandb
             data = {"global_step": step}
@@ -178,7 +177,6 @@ class Sb3Trainer:
                 dir=self.save_dir,
                 sync_tensorboard=True,
             )
-            # sync_tensorboard 下 wandb.log(step=...) 被忽略，改用 global_step 对齐 x 轴
             wandb.define_metric("eval/*", step_metric="global_step")
             wandb.define_metric("*", step_metric="global_step", hidden=True)
 
@@ -186,7 +184,7 @@ class Sb3Trainer:
     # Render
     # ------------------------------------------------------------------
 
-    def render(self, ckpt: str, agent_capital: int | None = None,
+    def render(self, ckpt: str, *, save_dir: str, agent_capital: int | None = None,
                opponent_capital: int | None = None, max_turns: int = 60) -> None:
         if not self.args.eval_opponent:
             return
@@ -201,7 +199,7 @@ class Sb3Trainer:
         opp_types = [s.strip() for s in self.args.eval_opponent.split(",")]
         wandb_videos = []
 
-        base, wandb_key = self._render_paths()
+        base, wandb_key = render_paths(save_dir)
         for opp_type in opp_types:
             env = LwgEnv(self.args.scenario)
             env.config.game.max_turns = max_turns
@@ -216,6 +214,3 @@ class Sb3Trainer:
 
         if wandb_videos:
             wandb.log({wandb_key: wandb_videos})
-
-    def _render_paths(self) -> tuple[str, str]:
-        return self.save_dir, "eval/videos"

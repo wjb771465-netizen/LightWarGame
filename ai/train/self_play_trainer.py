@@ -25,7 +25,6 @@ class SelfPlayTrainer(Sb3Trainer):
         num_players: int = self.env.get_attr("config")[0].game.num_players
         opponent_id = next(p for p in range(1, num_players + 1) if p != agent_id)
 
-        # 对手种类数，--n-envs 须为其整数倍
         n_opponents = self.args.n_opponents or self.args.n_envs
         n_envs = self.args.n_envs
         if n_envs % n_opponents != 0:
@@ -68,7 +67,6 @@ class SelfPlayTrainer(Sb3Trainer):
 
             self.log_eval_metrics({"elo": self._agent_elo}, step)
 
-            # 采样 n_opponents 种对手，每种发给 per_opponent 个 env
             specs = self._sample_opponent_specs(self._pool, n_opponents, opponent_id)
             steps = []
             for i, spec in enumerate(specs):
@@ -87,7 +85,7 @@ class SelfPlayTrainer(Sb3Trainer):
         final = final_model_path(self.save_dir)
         self.agent.save(final)
         logging.info("模型已保存至 %s/final.zip", self.save_dir)
-        self.render(final)
+        self.render(final, save_dir=self.save_dir)
 
     # ------------------------------------------------------------------
     # Opponent sampling
@@ -146,7 +144,6 @@ class SelfPlayTrainer(Sb3Trainer):
         if not (include_fixed and self.args.eval_opponent):
             return pool_specs
 
-        # 固定对手与池对手各占一半 env
         half = max(1, eval_n_envs // 2)
         pool_specs = pool_specs[:half]
         fixed_specs = self._fixed_opponent_specs(eval_n_envs - half, opponent_id)

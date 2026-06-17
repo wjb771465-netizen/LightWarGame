@@ -40,11 +40,6 @@ def final_model_path(save_dir: str) -> str:
     return os.path.join(save_dir, "final")
 
 
-def region_dir(save_dir: str, region_id: int) -> str:
-    """地区自博弈的子目录。"""
-    return os.path.join(save_dir, f"region_{region_id}")
-
-
 def extract_ckpt_step(path: str) -> str:
     """从 checkpoint 路径中提取 step 号字符串。"""
     return path.rsplit("ckpt_", 1)[-1]
@@ -53,6 +48,11 @@ def extract_ckpt_step(path: str) -> str:
 # ---------------------------------------------------------------------------
 # Formatting
 # ---------------------------------------------------------------------------
+
+def render_paths(save_dir: str) -> tuple[str, str]:
+    """渲染输出目录与 wandb key。"""
+    return save_dir, "eval/videos"
+
 
 def format_eval_specs(specs: list[dict]) -> str:
     """将 eval spec 列表格式化为可读的对手摘要字符串。"""
