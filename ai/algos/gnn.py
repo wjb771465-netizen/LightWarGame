@@ -13,9 +13,9 @@ def adj_to_edge_index(adj: np.ndarray) -> torch.Tensor:
 
 
 class GNNBackbone(nn.Module):
-    """2 层 GraphSAGE + mean pool + global concat → 固定维度 latent。
+    """2 层 GraphSAGE + skip connection + LayerNorm + mean pool + global concat。
 
-    不依赖游戏逻辑和 SB3，可独立测试。
+    Skip connection 保留原始特征信号，LayerNorm 阻止方差衰减。不依赖游戏逻辑和 SB3。
     """
 
     def __init__(
@@ -27,8 +27,14 @@ class GNNBackbone(nn.Module):
     ) -> None:
         super().__init__()
         self._num_nodes = num_nodes
+
+        self.res_proj = nn.Linear(in_channels, hidden_channels, bias=False)
         self.conv1 = SAGEConv(in_channels, hidden_channels)
+        self.norm1 = nn.LayerNorm(hidden_channels)
+
         self.conv2 = SAGEConv(hidden_channels, hidden_channels)
+        self.norm2 = nn.LayerNorm(hidden_channels)
+
         self.head = nn.Linear(hidden_channels + 2, out_dim)
         self.act = nn.ReLU()
 
@@ -43,8 +49,10 @@ class GNNBackbone(nn.Module):
         x = node_feats.reshape(B * N, -1)
         batch_edge = self._batch_edge_index(edge_index, B, N)
 
-        x = self.act(self.conv1(x, batch_edge))
-        x = self.act(self.conv2(x, batch_edge))
+        residual = self.res_proj(x)
+        x = self.act(self.norm1(self.conv1(x, batch_edge) + residual))
+
+        x = self.act(self.norm2(self.conv2(x, batch_edge) + x))
 
         x = x.view(B, N, -1).mean(dim=1)          # (B, hidden_channels)
         x = torch.cat([x, global_feats], dim=-1)   # (B, hidden_channels + 2)
