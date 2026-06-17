@@ -7,14 +7,17 @@ import threading
 from concurrent.futures import ThreadPoolExecutor, as_completed
 
 import torch
-from stable_baselines3.common.env_util import make_vec_env
-from stable_baselines3.common.vec_env import SubprocVecEnv, VecMonitor
 
 from ai.algos.policy import SB3Policy
 from ai.algos.region_pool import RegionPool
-from ai.envs.env import LwgEnv
 from ai.train.metrics import WinRateCallback
 from ai.train.self_play_trainer import SelfPlayTrainer
+from ai.train.utils import (
+    checkpoint_path,
+    extract_ckpt_step,
+    final_model_path,
+    region_dir,
+)
 
 
 class RegionSelfPlayTrainer(SelfPlayTrainer):
@@ -23,13 +26,26 @@ class RegionSelfPlayTrainer(SelfPlayTrainer):
     def __init__(self, args) -> None:
         super().__init__(args)
         raw = getattr(args, "region_self_play_regions", None)
-        self.regions: list[int] = (
+        self._regions: list[int] = (
             list(range(1, 32)) if raw is None
             else [int(x.strip()) for x in raw.split(",")]
         )
         self.pool = RegionPool(history=args.self_play_pool_size)
         self._log_lock = threading.Lock()
         torch.set_num_threads(args.n_training_threads)
+
+        # 每个地区独立的 env / agent / win_cb / elo
+        self._envs: dict[int, object] = {}
+        self._agents: dict[int, SB3Policy] = {}
+        self._win_cbs: dict[int, WinRateCallback] = {}
+        self._agent_elos: dict[int, float] = {}
+
+        for R in self._regions:
+            os.makedirs(region_dir(self.save_dir, R), exist_ok=True)
+            self._envs[R] = self.create_env()
+            self._agents[R] = self.create_agent(self._envs[R])
+            self._win_cbs[R] = WinRateCallback(window=self.args.win_rate_window)
+            self._agent_elos[R] = 1200.0
 
     # ------------------------------------------------------------------
     # Opponent sampling (region-aware override)
@@ -61,30 +77,11 @@ class RegionSelfPlayTrainer(SelfPlayTrainer):
         return specs
 
     # ------------------------------------------------------------------
-    # Public entry point
+    # Training loop
     # ------------------------------------------------------------------
 
     def train(self) -> None:
         self._init_logging()
-
-        scenario = self.args.scenario
-        envs: dict[int, VecMonitor] = {}
-        agents: dict[int, SB3Policy] = {}
-        win_cbs: dict[int, WinRateCallback] = {}
-
-        for R in self.regions:
-            os.makedirs(self._region_dir(R), exist_ok=True)
-            env = VecMonitor(
-                make_vec_env(lambda: LwgEnv(scenario), n_envs=self.args.n_envs,
-                             vec_env_cls=SubprocVecEnv, monitor_kwargs=None),
-                info_keywords=("win", "turn"),
-            )
-            envs[R] = env
-            agents[R] = SB3Policy(
-                env=env, args=self.args,
-                tb_log_dir=self._region_dir(R),
-            )
-            win_cbs[R] = WinRateCallback(window=self.args.win_rate_window)
 
         n_opponents = self.args.n_opponents or self.args.n_envs
         n_envs = self.args.n_envs
@@ -94,12 +91,11 @@ class RegionSelfPlayTrainer(SelfPlayTrainer):
             )
         per_opponent = n_envs // n_opponents
 
-        agent_elos: dict[int, float] = {R: 1200.0 for R in self.regions}
         total = self.args.total_timesteps
         chunk = self.args.checkpoint_freq
 
         while True:
-            active = [R for R in self.regions if agents[R].num_timesteps < total]
+            active = [R for R in self._regions if self._agents[R].num_timesteps < total]
             if not active:
                 break
 
@@ -109,11 +105,11 @@ class RegionSelfPlayTrainer(SelfPlayTrainer):
                 round_specs[R] = self._sample_opponent_specs(
                     self.pool, n_opponents, opponent_id=2, exclude_region=R)
 
-            # Phase 2: train all regions, per-env opponent + capital
+            # Phase 2: train all regions in parallel
             def _train_chunk(R: int) -> None:
-                agent = agents[R]
-                env = envs[R]
-                win_cb = win_cbs[R]
+                agent = self._agents[R]
+                env = self._envs[R]
+                win_cb = self._win_cbs[R]
                 specs = round_specs[R]
                 steps = min(chunk, total - agent.num_timesteps)
 
@@ -125,10 +121,10 @@ class RegionSelfPlayTrainer(SelfPlayTrainer):
                     env.env_method("set_opponent", spec, indices=indices)
                     opp_region = spec.get("opp_region")
                     if opp_region is None:
-                        opp_region = random.choice([r for r in self.regions if r != R])
+                        opp_region = random.choice([r for r in self._regions if r != R])
                     env.env_method("set_capitals", R, opp_region, indices=indices)
                     if spec["type"] == "policy":
-                        opp_info.append((opp_region, int(spec["path"].rsplit("ckpt_", 1)[-1])))
+                        opp_info.append((opp_region, int(extract_ckpt_step(spec["path"]))))
                     else:
                         opp_info.append((opp_region, spec["type"]))
                 info_str = ", ".join(f"R{r}->s{step}" if isinstance(step, int) else f"R{r}->{step}"
@@ -142,26 +138,26 @@ class RegionSelfPlayTrainer(SelfPlayTrainer):
                 agent._model._custom_logger = True
                 step = agent.num_timesteps
 
-                ckpt = os.path.join(self._region_dir(R), f"ckpt_{step}")
+                ckpt = checkpoint_path(region_dir(self.save_dir, R), step)
                 agent.save(ckpt)
 
                 ckpt_zip = ckpt + ".zip"
                 if self.args.use_eval:
-                    results = self.eval(ckpt, env, step, region=R)
-                    prev_elo = agent_elos[R]
-                    evicted, agent_elos[R], accepted = self.pool.add(
-                        R, ckpt_zip, step, elo=agent_elos[R], outcomes=results)
+                    results = self.eval(ckpt, step, region=R)
+                    prev_elo = self._agent_elos[R]
+                    evicted, self._agent_elos[R], accepted = self.pool.add(
+                        R, ckpt_zip, step, elo=self._agent_elos[R], outcomes=results)
                     if accepted:
                         logging.info("[RegionSP R=%d] step=%d, ELO %.1f -> %.1f, 入池",
-                                     R, step, prev_elo, agent_elos[R])
+                                     R, step, prev_elo, self._agent_elos[R])
                     else:
                         logging.info("[RegionSP R=%d] step=%d, ELO %.1f -> %.1f, 跳过入池",
-                                     R, step, prev_elo, agent_elos[R])
+                                     R, step, prev_elo, self._agent_elos[R])
                 else:
                     self.pool.add(R, ckpt_zip, step)
 
                 if self.args.use_eval:
-                    self.log_eval_metrics({"elo": agent_elos[R]}, step, region=R)
+                    self.log_eval_metrics({"elo": self._agent_elos[R]}, step, region=R)
 
             max_workers = max(1, min(self.args.parallel_regions, len(active)))
             with ThreadPoolExecutor(max_workers=max_workers) as executor:
@@ -171,26 +167,27 @@ class RegionSelfPlayTrainer(SelfPlayTrainer):
 
             self.pool.save(os.path.join(self.save_dir, "pool_state.json"))
 
-        for R in self.regions:
-            agents[R].save(os.path.join(self._region_dir(R), "final"))
+        for R in self._regions:
+            final = final_model_path(region_dir(self.save_dir, R))
+            self._agents[R].save(final)
         logging.info("[RegionSelfPlay] 训练完成，模型保存至 %s", self.save_dir)
 
-        for R in self.regions:
-            opp = random.choice([r for r in self.regions if r != R])
+        for R in self._regions:
+            opp = random.choice([r for r in self._regions if r != R])
             self._render_region = R
-            self.render(os.path.join(self._region_dir(R), "final"),
+            self.render(final_model_path(region_dir(self.save_dir, R)),
                         agent_capital=R, opponent_capital=opp)
 
     # ------------------------------------------------------------------
     # Eval opponents
     # ------------------------------------------------------------------
 
-    def choose_eval_opponents(self, env, include_fixed: bool = True, region: int | None = None) -> list[dict]:
+    def choose_eval_opponents(self, include_fixed: bool = True, region: int | None = None) -> list[dict]:
         """从 RegionPool 采样 eval 对手 + 可选固定对手。"""
         eval_n_envs = self.args.eval_n_envs or self.args.n_envs
         eval_n_opponents = self.args.eval_n_opponents or self.args.n_opponents or self.args.n_envs
-        opponent_id = self._opponent_id(env)
-        R = region if region is not None else self.regions[0]
+        opponent_id = self._opponent_id()
+        R = region if region is not None else self._regions[0]
 
         if not self.pool.available_regions():
             pool_specs = eval_n_envs * [
@@ -213,11 +210,11 @@ class RegionSelfPlayTrainer(SelfPlayTrainer):
 
         for spec in pool_specs:
             if spec.get("opp_region") is None:
-                spec["opp_region"] = random.choice([r for r in self.regions if r != R])
+                spec["opp_region"] = random.choice([r for r in self._regions if r != R])
         return pool_specs
 
     # ------------------------------------------------------------------
-    # Helpers
+    # Logging / Render paths
     # ------------------------------------------------------------------
 
     def log_eval_metrics(self, metrics: dict, step: int, region: int | None = None) -> None:
@@ -233,9 +230,6 @@ class RegionSelfPlayTrainer(SelfPlayTrainer):
 
     def _render_paths(self) -> tuple[str, str]:
         R = self._render_region
-        base = os.path.join(self.save_dir, f"region_{R}")
+        base = region_dir(self.save_dir, R)
         key = f"region_{R}_eval/videos"
         return base, key
-
-    def _region_dir(self, R: int) -> str:
-        return os.path.join(self.save_dir, f"region_{R}")

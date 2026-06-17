@@ -3,60 +3,63 @@ from __future__ import annotations
 import logging
 import os
 import random
-from datetime import datetime
 
-import numpy as np
-import torch
 from stable_baselines3.common.env_util import make_vec_env
 from stable_baselines3.common.vec_env import SubprocVecEnv, VecEnv, VecMonitor
 
 from ai.algos.policy import SB3Policy
 from ai.envs.env import LwgEnv
 from ai.train.metrics import WinRateCallback
-
-
-def _resolve_save_dir(args) -> str:
-    if args.save_dir is not None:
-        return args.save_dir
-    ts = datetime.now().strftime("%Y%m%d_%H%M%S")
-    return os.path.join("ai", "train", "results", args.scenario, f"run_{ts}")
-
-
-def _set_seeds(seed: int) -> None:
-    random.seed(seed)
-    np.random.seed(seed)
-    torch.manual_seed(seed)
-
-
-def _format_eval_specs(specs: list[dict]) -> str:
-    """将 eval spec 列表格式化为可读的对手摘要字符串。"""
-    def _label(s: dict) -> str:
-        if s["type"] == "policy":
-            step = s.get("path", "").rsplit("ckpt_", 1)[-1]
-            return f"s{step}"
-        return s["type"]
-    return ", ".join(_label(s) for s in specs[:8]) + (", ..." if len(specs) > 8 else "")
+from ai.train.utils import (
+    checkpoint_path,
+    final_model_path,
+    format_eval_specs,
+    resolve_save_dir,
+    set_seeds,
+)
 
 
 class Sb3Trainer:
 
     def __init__(self, args) -> None:
         self.args = args
-        self.save_dir = _resolve_save_dir(args)
+        self.save_dir = resolve_save_dir(args.scenario, args.save_dir)
         os.makedirs(self.save_dir, exist_ok=True)
-        _set_seeds(args.seed)
+        set_seeds(args.seed)
+        self.env = self.create_env()
+        self.agent = self.create_agent(self.env)
+        self._win_cb = WinRateCallback(window=self.args.win_rate_window)
+
+    # ------------------------------------------------------------------
+    # Training loop
+    # ------------------------------------------------------------------
 
     def train(self) -> None:
-        env   = self.create_env()
-        agent = self.create_agent(env)
-        self._win_cb = WinRateCallback(window=self.args.win_rate_window)
         self._init_logging()
-        self.run(agent, env)
+        total = self.args.total_timesteps
+        chunk = self.args.checkpoint_freq
+        while self.agent.num_timesteps < total:
+            steps = min(chunk, total - self.agent.num_timesteps)
+            self.agent.learn(steps, callback=[self._win_cb])
+            self.agent._model._custom_logger = True  # 复用 SummaryWriter，避免多 tfevents 文件
+            step = self.agent.num_timesteps
+            ckpt = checkpoint_path(self.save_dir, step)
+            self.agent.save(ckpt)
+            if self.args.use_eval:
+                self.eval(ckpt, step)
+        final = final_model_path(self.save_dir)
+        self.agent.save(final)
+        logging.info("模型已保存至 %s/final.zip", self.save_dir)
+        self.render(final)
+
+    # ------------------------------------------------------------------
+    # Env / Agent factories
+    # ------------------------------------------------------------------
 
     def create_env(self) -> VecEnv:
-        scenario = self.args.scenario
         return VecMonitor(
-            make_vec_env(lambda: LwgEnv(scenario), n_envs=self.args.n_envs, vec_env_cls=SubprocVecEnv, monitor_kwargs=None),
+            make_vec_env(lambda: LwgEnv(self.args.scenario), n_envs=self.args.n_envs,
+                         vec_env_cls=SubprocVecEnv, monitor_kwargs=None),
             info_keywords=("win", "turn"),
         )
 
@@ -66,38 +69,23 @@ class Sb3Trainer:
             return SB3Policy(path=resume, env=env)
         return SB3Policy(env=env, args=self.args, tb_log_dir=self.save_dir)
 
-    def run(self, agent: SB3Policy, env: VecEnv) -> None:
-        total = self.args.total_timesteps
-        chunk = self.args.checkpoint_freq
-        while agent.num_timesteps < total:
-            agent.learn(min(chunk, total - agent.num_timesteps), callback=[self._win_cb])
-            agent._model._custom_logger = True  # 复用 SummaryWriter，避免多 tfevents 文件
-            step = agent.num_timesteps
-            ckpt = os.path.join(self.save_dir, f"ckpt_{step}")
-            agent.save(ckpt)
-            if self.args.use_eval:
-                self.eval(ckpt, env, step)
-        agent.save(os.path.join(self.save_dir, "final"))
-        logging.info("模型已保存至 %s/final.zip", self.save_dir)
-        self.render(os.path.join(self.save_dir, "final"))
-
     # ------------------------------------------------------------------
     # Eval
     # ------------------------------------------------------------------
 
-    def eval(self, ckpt: str, env, step: int, region: int | None = None) -> list:
+    def eval(self, ckpt: str, step: int, region: int | None = None) -> list:
         """评估 agent vs 对手并记录指标。子类覆写 choose_eval_opponents 以接入 pool。"""
         freq = max(1, self.args.eval_opponent_freq)
         ckpt_idx = step // max(1, self.args.checkpoint_freq)
         include_fixed = self.args.eval_opponent and (ckpt_idx % freq == 0)
 
-        specs = self.choose_eval_opponents(env, include_fixed=include_fixed, region=region)
+        specs = self.choose_eval_opponents(include_fixed=include_fixed, region=region)
         if not specs:
             return []
 
         from ai.train.eval import evaluate, aggregate_win_rate, aggregate_avg_turns
 
-        summary = _format_eval_specs(specs)
+        summary = format_eval_specs(specs)
         logging.info("[Eval] step=%d n=%d eps=%d fixed=%s [%s]",
                      step, len(specs), self.args.eval_episodes, include_fixed, summary)
         results = evaluate(ckpt, specs, self.args.scenario, self.args.eval_episodes,
@@ -118,10 +106,10 @@ class Sb3Trainer:
 
         return results
 
-    def choose_eval_opponents(self, env, include_fixed: bool = True, region: int | None = None) -> list[dict]:
+    def choose_eval_opponents(self, include_fixed: bool = True, region: int | None = None) -> list[dict]:
         """eval_n_envs 个固定对手 spec。SelfPlay/RegionSelfPlay 子类覆写以接入 pool。"""
         eval_n_envs = self.args.eval_n_envs or self.args.n_envs
-        opponent_id = self._opponent_id(env)
+        opponent_id = self._opponent_id()
 
         if self.args.eval_opponent_path:
             return eval_n_envs * [
@@ -159,9 +147,9 @@ class Sb3Trainer:
         # n_types == eval_n_envs
         return [{"type": t, "player_id": opponent_id} for t in opp_types]
 
-    def _opponent_id(self, env) -> int:
-        agent_id: int = env.get_attr("agent_id")[0]
-        num_players: int = env.get_attr("config")[0].game.num_players
+    def _opponent_id(self) -> int:
+        agent_id: int = self.env.get_attr("agent_id")[0]
+        num_players: int = self.env.get_attr("config")[0].game.num_players
         return next(p for p in range(1, num_players + 1) if p != agent_id)
 
     # ------------------------------------------------------------------
@@ -203,7 +191,6 @@ class Sb3Trainer:
             return
 
         from ai.algos.policy import SB3Policy
-        from ai.envs.env import LwgEnv
         from ai.renders.render import render as render_episodes
 
         if self.args.wandb:
