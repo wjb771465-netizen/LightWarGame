@@ -50,7 +50,10 @@ def extract_ckpt_step(path: str) -> str:
 # ---------------------------------------------------------------------------
 
 def render_paths(save_dir: str) -> tuple[str, str]:
-    """渲染输出目录与 wandb key。"""
+    """渲染输出目录与 wandb key。自动从路径中提取 region 前缀。"""
+    base = os.path.basename(save_dir)
+    if base.startswith("region_"):
+        return save_dir, f"{base}_eval/videos"
     return save_dir, "eval/videos"
 
 
