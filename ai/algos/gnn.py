@@ -50,9 +50,9 @@ class GNNBackbone(nn.Module):
         batch_edge = self._batch_edge_index(edge_index, B, N)
 
         residual = self.res_proj(x)
-        x = self.act(self.norm1(self.conv1(x, batch_edge) + residual))
+        x = self.norm1(self.act(self.conv1(x, batch_edge) + residual))
 
-        x = self.act(self.norm2(self.conv2(x, batch_edge) + x))
+        x = self.norm2(self.act(self.conv2(x, batch_edge) + x))
 
         x = x.view(B, N, -1).mean(dim=1)          # (B, hidden_channels)
         x = torch.cat([x, global_feats], dim=-1)   # (B, hidden_channels + 2)
