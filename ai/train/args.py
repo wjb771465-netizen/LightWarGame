@@ -20,7 +20,6 @@ def get_config() -> argparse.ArgumentParser:
         description="Train MaskablePPO on LightWarGame",
     )
     parser = _get_prepare_config(parser)
-    parser = _get_network_config(parser)
     parser = _get_ppo_config(parser)
     parser = _get_save_config(parser)
     parser = _get_eval_config(parser)
@@ -52,27 +51,6 @@ def _get_prepare_config(parser: argparse.ArgumentParser) -> argparse.ArgumentPar
         "--seed", type=int, default=42,
         help="全局随机种子（default: 42）",
     )
-    return parser
-
-
-# ---------------------------------------------------------------------------
-# Network
-# ---------------------------------------------------------------------------
-
-def _get_network_config(parser: argparse.ArgumentParser) -> argparse.ArgumentParser:
-    """
-    Network parameters（骨架三选一，互斥）：
-        --use-adj               邻接信息进观测（MLP 骨架，obs dim 374）
-        --use-transformer       Transformer 骨架（obs dim 343）
-        --use-gnn               GNN 骨架（obs dim 343）
-    """
-    group = parser.add_argument_group("Network parameters")
-    group.add_argument("--use-adj", action="store_true", default=False,
-                       help="邻接信息进观测（is_adj_to_my_territory，1 bit/region）")
-    group.add_argument("--use-transformer", action="store_true", default=False,
-                       help="[未实现] Transformer 骨架")
-    group.add_argument("--use-gnn", action="store_true", default=False,
-                       help="[未实现] GNN 骨架")
     return parser
 
 
