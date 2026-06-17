@@ -62,19 +62,13 @@ class Sb3Trainer:
         scenario = self.args.scenario
 
         def _make_env():
-            try:
-                return LwgEnv(scenario)
-            except Exception:
-                import sys, traceback
-                traceback.print_exc(file=sys.stderr)
-                sys.stderr.flush()
-                raise
+            import faulthandler, sys
+            faulthandler.enable(file=sys.stderr)
+            return LwgEnv(scenario)
 
         return VecMonitor(
             make_vec_env(_make_env, n_envs=self.args.n_envs,
-                         vec_env_cls=SubprocVecEnv,
-                         vec_env_kwargs={"start_method": "spawn"},
-                         monitor_kwargs=None),
+                         vec_env_cls=SubprocVecEnv, monitor_kwargs=None),
             info_keywords=("win", "turn"),
         )
 
