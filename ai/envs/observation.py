@@ -20,20 +20,26 @@ class ObservationEncoder:
 
     每个 region 编码为 F 维：
       owner_onehot (max_players+1) | troops_norm | is_capital | base_growth_norm
-      | is_visible | is_adj_to_my_territory
+      | is_visible [| is_adj_to_my_territory]
 
     owner 使用 viewer-relative one-hot：
       index 0 = neutral, index 1 = viewer 自己, index 2+ = 其他玩家（player_id 升序）
+
+    use_adjacency=True 时追加 is_adj_to_my_territory（1 维），表示该地区是否与己方领土相邻。
     """
 
     def __init__(self, game_map: GameMap, max_players: int,
                  max_troops: int = _MAX_TROOPS,
                  max_growth: int = _MAX_GROWTH,
-                 cmd_max: int = _CMD_MAX) -> None:
+                 cmd_max: int = _CMD_MAX,
+                 use_adjacency: bool = False) -> None:
         self._game_map = game_map
         self._max_players = max_players
         self._num_regions = len(game_map.regions) - 1  # 1-indexed, skip index 0
-        self._F = max_players + 6  # owner_onehot(max_players+1) + 5 scalars
+        self._use_adjacency = use_adjacency
+        self._F = max_players + 5  # troops, is_capital, base_growth, is_visible
+        if use_adjacency:
+            self._F += 1  # is_adj_to_my_territory
         self._G = 2   # global: commands_total, commands_used
         self.dim = self._num_regions * self._F + self._G
         self._max_troops = max_troops
@@ -59,15 +65,16 @@ class ObservationEncoder:
         other_players = sorted(p for p in range(1, max_players + 1) if p != viewer_id)
         other_rank = {p: 2 + i for i, p in enumerate(other_players)}
 
-        viewer_owned: Set[int] = {
-            r.region_id for r in obs.regions[1:] if r is not None and r.owner == viewer_id
-        }
-        adj_to_mine: Set[int] = set()
-        for rid in viewer_owned:
-            region = game_map.regions[rid]
-            if region is not None:
-                adj_to_mine.update(region.adjacent)
-        adj_to_mine -= viewer_owned
+        if self._use_adjacency:
+            viewer_owned: Set[int] = {
+                r.region_id for r in obs.regions[1:] if r is not None and r.owner == viewer_id
+            }
+            adj_to_mine: Set[int] = set()
+            for rid in viewer_owned:
+                region = game_map.regions[rid]
+                if region is not None:
+                    adj_to_mine.update(region.adjacent)
+            adj_to_mine -= viewer_owned
 
         for idx, r_obs in enumerate(obs.regions[1:]):
             if r_obs is None:
@@ -94,7 +101,8 @@ class ObservationEncoder:
             o += 1
             vec[base + o] = 1.0 if r_obs.troops is not None else 0.0
             o += 1
-            vec[base + o] = 1.0 if r_obs.region_id in adj_to_mine else 0.0
+            if self._use_adjacency:
+                vec[base + o] = 1.0 if r_obs.region_id in adj_to_mine else 0.0
 
         # 全局特征（倒数两维）
         vec[-2] = min(commands_total / self._cmd_max, 1.0)

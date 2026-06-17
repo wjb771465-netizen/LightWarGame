@@ -42,6 +42,7 @@ class LwgEnv(gym.Env):
             max_troops=self.config.observation.max_troops,
             max_growth=self.config.observation.max_growth,
             cmd_max=self.config.observation.cmd_max,
+            use_adjacency=getattr(self.config.observation, "use_adjacency", False),
         )
         self.act_encoder = ActionEncoder(
             game_map,

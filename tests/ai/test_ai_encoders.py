@@ -35,8 +35,8 @@ class TestObservationEncoder(unittest.TestCase):
         self.vec = self.enc.encode(self.obs)
 
     def test_dim_matches_formula(self):
-        # obs_dim = num_regions × (max_players + 6) + G（G=2: commands_total, commands_used）
-        expected = 3 * (2 + 6) + 2
+        # baseline: F = max_players + 5, G = 2
+        expected = 3 * (2 + 5) + 2
         self.assertEqual(self.enc.dim, expected)
 
     def test_encoded_shape_matches_dim(self):
@@ -87,6 +87,25 @@ class TestObservationEncoder(unittest.TestCase):
         troops_offset = 2 + 1  # max_players+1
         self.assertAlmostEqual(self.vec[base + troops_offset], 0.0)
 
+    def test_no_adjacency_feature_in_baseline(self):
+        # baseline 模式：每个 region F = max_players+5，末尾无 is_adj_to_my_territory
+        self.assertEqual(self.enc._F, 2 + 5)
+
+
+class TestObservationEncoderWithAdj(unittest.TestCase):
+    """use_adjacency=True：追加 is_adj_to_my_territory（1 bit/region）。"""
+
+    def setUp(self):
+        self.gm = _make_map()
+        self.enc = ObservationEncoder(self.gm, max_players=2, use_adjacency=True)
+        self.obs = build_observation(self.gm, turn=1, viewer_id=1)
+        self.vec = self.enc.encode(self.obs)
+
+    def test_dim_matches_formula(self):
+        # F = max_players + 6, G = 2
+        expected = 3 * (2 + 6) + 2
+        self.assertEqual(self.enc.dim, expected)
+
     def test_adj_to_my_territory_set_for_enemy_neighbor(self):
         # region2 与 region1（己方）相邻 → is_adj_to_my_territory=1
         F = self.enc._F
@@ -100,6 +119,38 @@ class TestObservationEncoder(unittest.TestCase):
         base = 2 * F
         adj_offset = (2 + 1) + 4
         self.assertAlmostEqual(self.vec[base + adj_offset], 0.0)
+
+
+class TestAdjacencyMatrix(unittest.TestCase):
+
+    def setUp(self):
+        self.gm = _make_map()
+
+    def test_shape(self):
+        mat = self.gm.adjacency_matrix
+        self.assertEqual(mat.shape, (3, 3))
+
+    def test_no_self_loop(self):
+        mat = self.gm.adjacency_matrix
+        for i in range(3):
+            self.assertEqual(mat[i, i], 0.0)
+
+    def test_symmetric(self):
+        mat = self.gm.adjacency_matrix
+        np = __import__("numpy")
+        self.assertTrue(np.allclose(mat, mat.T))
+
+    def test_correct_edges(self):
+        mat = self.gm.adjacency_matrix
+        # region1(id=1) ↔ region2(id=2): row0,col1 and row1,col0 = 1
+        self.assertEqual(mat[0, 1], 1.0)
+        self.assertEqual(mat[1, 0], 1.0)
+        # region2(id=2) ↔ region3(id=3): row1,col2 and row2,col1 = 1
+        self.assertEqual(mat[1, 2], 1.0)
+        self.assertEqual(mat[2, 1], 1.0)
+        # region1(id=1) 不与 region3(id=3) 相邻
+        self.assertEqual(mat[0, 2], 0.0)
+        self.assertEqual(mat[2, 0], 0.0)
 
 
 class TestActionEncoder(unittest.TestCase):
