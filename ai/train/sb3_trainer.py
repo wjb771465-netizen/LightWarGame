@@ -7,6 +7,8 @@ import random
 from stable_baselines3.common.env_util import make_vec_env
 from stable_baselines3.common.vec_env import SubprocVecEnv, VecEnv, VecMonitor
 
+from ai.algos.gnn import adj_to_edge_index
+from ai.algos.extractors import GNNExtractor
 from ai.algos.policy import SB3Policy
 from ai.envs.env import LwgEnv
 from ai.train.metrics import WinRateCallback
@@ -31,9 +33,6 @@ class Sb3Trainer:
         self.agent = self.create_agent(self.env, tb_log_dir=self.save_dir)
         self._win_cb = WinRateCallback(window=self.args.win_rate_window)
 
-    # ------------------------------------------------------------------
-    # Training loop
-    # ------------------------------------------------------------------
 
     def train(self) -> None:
         self._init_logging()
@@ -54,11 +53,19 @@ class Sb3Trainer:
         logging.info("模型已保存至 %s/final.zip", self.save_dir)
         self.render(final, save_dir=self.save_dir)
 
-    # ------------------------------------------------------------------
-    # Env / Agent factories
-    # ------------------------------------------------------------------
 
     def create_env(self) -> VecEnv:
+        # --use-gnn 要求 YAML 里 use_adjacency: false
+        if self.args.use_gnn or self.args.use_transformer:
+            from ai.envs.utils import parse_config
+            cfg = parse_config(self.args.scenario)
+            if getattr(cfg.observation, "use_adjacency", False):
+                raise ValueError(
+                    f"--use-gnn/--use-transformer requires use_adjacency: false "
+                    f"in YAML config, but got true. "
+                    f"Edit the observation section of your scenario config."
+                )
+
         scenario = self.args.scenario
 
         def _wrap_env():
@@ -93,11 +100,30 @@ class Sb3Trainer:
         resume = getattr(self.args, "resume_from", None)
         if resume:
             return SB3Policy(path=resume, env=env)
-        return SB3Policy(env=env, args=self.args, tb_log_dir=tb_log_dir)
 
-    # ------------------------------------------------------------------
-    # Eval
-    # ------------------------------------------------------------------
+        policy_kwargs: dict = {}
+
+        if self.args.use_gnn:
+            obs_encoder = env.get_attr("obs_encoder")[0]
+            game_map = env.get_attr("game_map")[0]
+            edge_index = adj_to_edge_index(game_map.adjacency_matrix)
+            policy_kwargs.update(
+                features_extractor_class=GNNExtractor,
+                features_extractor_kwargs=dict(
+                    num_regions=len(game_map.regions) - 1,
+                    feat_dim=obs_encoder._F,
+                    global_dim=obs_encoder._G,
+                    edge_index=edge_index,
+                    hidden_channels=self.args.gnn_hidden_channels,
+                ),
+                net_arch=[],
+            )
+        else:
+            policy_kwargs["net_arch"] = self.args.net_arch
+
+        return SB3Policy(env=env, args=self.args, policy_kwargs=policy_kwargs,
+                         tb_log_dir=tb_log_dir)
+
 
     def eval(self, ckpt: str, step: int, region: int | None = None) -> list:
         """评估 agent vs 对手并记录指标。子类覆写 choose_eval_opponents 以接入 pool。"""
@@ -176,9 +202,6 @@ class Sb3Trainer:
         num_players: int = self.env.get_attr("config")[0].game.num_players
         return next(p for p in range(1, num_players + 1) if p != agent_id)
 
-    # ------------------------------------------------------------------
-    # Logging
-    # ------------------------------------------------------------------
 
     def log_eval_metrics(self, metrics: dict, step: int, region: int | None = None) -> None:
         if self.args.wandb:
@@ -203,9 +226,6 @@ class Sb3Trainer:
             wandb.define_metric("eval/*", step_metric="global_step")
             wandb.define_metric("*", step_metric="global_step", hidden=True)
 
-    # ------------------------------------------------------------------
-    # Render
-    # ------------------------------------------------------------------
 
     def render(self, ckpt: str, *, save_dir: str, agent_capital: int | None = None,
                opponent_capital: int | None = None, max_turns: int = 60) -> None:

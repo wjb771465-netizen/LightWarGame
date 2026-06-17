@@ -14,9 +14,6 @@ class SelfPlayTrainer(Sb3Trainer):
         self._pool = OpponentPool(max_size=self.args.self_play_pool_size)
         self._agent_elo = 1200.0
 
-    # ------------------------------------------------------------------
-    # Training loop
-    # ------------------------------------------------------------------
 
     def train(self) -> None:
         self._init_logging()
@@ -87,9 +84,6 @@ class SelfPlayTrainer(Sb3Trainer):
         logging.info("模型已保存至 %s/final.zip", self.save_dir)
         self.render(final, save_dir=self.save_dir)
 
-    # ------------------------------------------------------------------
-    # Opponent sampling
-    # ------------------------------------------------------------------
 
     def _sample_opponent_specs(self, pool, n_total: int, opponent_id: int) -> list[dict]:
         """从 OpponentPool 中有放回采样 n_total 个对手 spec。"""
@@ -119,9 +113,6 @@ class SelfPlayTrainer(Sb3Trainer):
 
         return specs
 
-    # ------------------------------------------------------------------
-    # Eval opponents
-    # ------------------------------------------------------------------
 
     def choose_eval_opponents(self, include_fixed: bool = True, region: int | None = None) -> list[dict]:
         """从 OpponentPool 采样 eval 对手 + 可选固定对手。"""

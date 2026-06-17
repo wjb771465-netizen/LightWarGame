@@ -62,9 +62,6 @@ class RegionSelfPlayTrainer(SelfPlayTrainer):
             self._cached_opponent_id = next(p for p in range(1, num_players + 1) if p != agent_id)
         return self._cached_opponent_id
 
-    # ------------------------------------------------------------------
-    # Opponent sampling (region-aware override)
-    # ------------------------------------------------------------------
 
     def _sample_opponent_specs(self, pool, n_total: int, opponent_id: int,
                                exclude_region: int) -> list[dict]:
@@ -91,9 +88,6 @@ class RegionSelfPlayTrainer(SelfPlayTrainer):
                                "player_id": opponent_id})
         return specs
 
-    # ------------------------------------------------------------------
-    # Training loop
-    # ------------------------------------------------------------------
 
     def train(self) -> None:
         self._init_logging()
@@ -193,9 +187,6 @@ class RegionSelfPlayTrainer(SelfPlayTrainer):
             self.render(final_model_path(self.save_dirs[R]),
                         save_dir=self.save_dirs[R], agent_capital=R, opponent_capital=opp)
 
-    # ------------------------------------------------------------------
-    # Eval opponents
-    # ------------------------------------------------------------------
 
     def choose_eval_opponents(self, include_fixed: bool = True, region: int | None = None) -> list[dict]:
         """从 RegionPool 采样 eval 对手 + 可选固定对手。"""
@@ -228,9 +219,6 @@ class RegionSelfPlayTrainer(SelfPlayTrainer):
                 spec["opp_region"] = random.choice([r for r in self._regions if r != R])
         return pool_specs
 
-    # ------------------------------------------------------------------
-    # Logging / Render paths
-    # ------------------------------------------------------------------
 
     def log_eval_metrics(self, metrics: dict, step: int, region: int | None = None) -> None:
         if self.args.wandb:

@@ -27,11 +27,18 @@
 
 ## Test Conventions
 
-- **Framework**: `unittest`，命令 `conda run -n chinese_war_game python -m unittest tests.xxx -v`
+- **Framework**: `unittest`，通过项目根目录的 `Makefile` 运行：
+  - `make test` — 全量（跳过集成测试，需要 `RUN_INTEGRATION` 或 `SILICONFLOW_API_KEY` 环境变量）
+  - `make test-ai` — 仅 `tests/ai/`
+  - `make test-game` — 仅 `tests/game/`
+  - `make test-integration` — 仅 `tests/integration/`
+  - 单文件：`conda run -n chinese_war_game python -m unittest tests.xxx -v`
+  - discover 必须带 `-t .` 保证 import 路径正确
 - **目录**: `tests/game/` 测 game 层，`tests/ai/` 测 ai 层，`tests/integration/` 跨层端到端
 - **小地图**: `tests/helpers.map_with_regions(regions)` — 绕过配置加载直接注入 `Region` 列表（index 0 为 None，1-indexed）。所有非端到端测试都用 2-3 个手造 Region，不依赖 `data/map_configs/cn.json`
 - **Region 手造模式**: `r = Region("name", [adjacent_ids], base_growth)` → 直接设 `r.owner`、`r.troops`、`r.is_capital`
 - **Mock Policy**: 实现 `predict(obs, mask) -> int` 的可编程对象（按预设顺序返回动作，记录 `last_obs`/`last_mask` 用于断言），不加载真实模型权重
+- **纯 NN 模块测试**: 只测张量进出（forward shape、eval 确定性），不依赖 SB3、GameMap、YAML。`GNNBackbone` 等纯 `nn.Module` 的测试归入 `tests/ai/test_nn.py`
 - **Test class > method**: `TestXxx` 继承 `unittest.TestCase`，方法 `test_xxx` 带中文或英文 docstring
 - **setUp/setUpClass**: 共享 fixture 放 `setUp()` 中构造；简单的 factory method 也行（`_linear_map()` 等返回 state/map）
 - **跳过集成测试**: `@unittest.skipUnless(os.getenv("RUN_INTEGRATION"), "...")`，默认不跑昂贵测试
@@ -45,3 +52,15 @@
 - PyTorch >= 2.0
 - NumPy, Matplotlib（渲染）
 - wandb, tensorboard（训练监控）
+
+## W&B 诊断
+
+用 `/wandb-primary` skill 可查训练 run 的 config、metrics 时序、日志等。本项目关键 metrics 路径：
+
+```
+训练:  region_{R}/MaskablePPO_1/rollout/{ep_rew_mean, win_rate_200, ep_len_mean}
+       region_{R}/MaskablePPO_1/train/{value_loss, entropy_loss, approx_kl, clip_fraction, loss, explained_variance}
+评估:  region_{R}_eval/{elo, vs_*/win_rate}
+```
+
+其中 value_loss、entropy_loss、approx_kl、clip_fraction 四个能反映 PPO 训练健康度：value_loss 是否飞涨、策略熵是否过早塌缩、KL 和 clip 比例是否归零（策略停止更新）。

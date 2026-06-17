@@ -180,3 +180,19 @@ class TestFixedOpponentSpecs(unittest.TestCase):
         # 前 4 个是两轮 cycle
         self.assertEqual([s["type"] for s in specs[:4]],
                          ["random", "rule", "random", "rule"])
+
+
+class TestGNNConfigConflict(unittest.TestCase):
+    """--use-gnn + YAML use_adjacency: true → 报错退出。"""
+
+    def test_conflict_raises_value_error(self):
+        parser = get_config()
+        # vsbaseline.yaml 有 use_adjacency: true
+        args = parser.parse_args([
+            "--scenario", "duel/vsbaseline", "--use-gnn",
+            "--total-timesteps", "512",
+        ])
+        from ai.train.sb3_trainer import Sb3Trainer
+        with self.assertRaises(ValueError) as ctx:
+            Sb3Trainer(args)
+        self.assertIn("use_adjacency", str(ctx.exception))

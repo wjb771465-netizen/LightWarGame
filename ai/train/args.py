@@ -21,6 +21,7 @@ def get_config() -> argparse.ArgumentParser:
     )
     parser = _get_prepare_config(parser)
     parser = _get_ppo_config(parser)
+    parser = _get_network_config(parser)
     parser = _get_save_config(parser)
     parser = _get_eval_config(parser)
     parser = _get_log_config(parser)
@@ -88,12 +89,36 @@ def _get_ppo_config(parser: argparse.ArgumentParser) -> argparse.ArgumentParser:
                        help="GAE lambda（default: 0.95）")
     group.add_argument("--clip-range", type=float, default=0.2,
                        help="PPO clip 系数（default: 0.2）")
-    group.add_argument("--net-arch", type=int, nargs="+", default=[256, 256],
-                       help="MLP 隐层大小序列（default: 256 256）")
     group.add_argument("--n-envs", type=int, default=4,
                        help="训练 rollout 并行环境数（default: 4）")
     group.add_argument("--n-opponents", type=int, default=None,
                        help="每 chunk 对手种类数，--n-envs 须为其整数倍，多个 env 可共享同一对手（default: 与 --n-envs 相同）")
+    return parser
+
+
+
+# ---------------------------------------------------------------------------
+# Network
+# ---------------------------------------------------------------------------
+
+def _get_network_config(parser: argparse.ArgumentParser) -> argparse.ArgumentParser:
+    """
+    Network parameters:
+        --net-arch <int ...>        MLP 隐层大小序列（default: 256 256）
+        --gnn-hidden-channels <int> GNN 隐层宽度（default: 128）
+        --use-gnn                   GNN 骨架（GraphSAGE）
+        --use-transformer           Transformer 骨架（尚未实现）
+    """
+    group = parser.add_argument_group("Network parameters")
+    group.add_argument("--net-arch", type=int, nargs="+", default=[256, 256],
+                       help="MLP 隐层大小序列（default: 256 256）")
+    group.add_argument("--gnn-hidden-channels", type=int, default=128,
+                       help="GNN 隐层宽度（default: 128）")
+    backbone = group.add_mutually_exclusive_group()
+    backbone.add_argument("--use-gnn", action="store_true", default=False,
+                          help="使用 GNN 骨架（GraphSAGE）")
+    backbone.add_argument("--use-transformer", action="store_true", default=False,
+                          help="使用 Transformer 骨架（尚未实现）")
     return parser
 
 

@@ -35,17 +35,17 @@ class LwgEnv(gym.Env):
         self.config = parse_config(config_name)
         self.agent_id = agent_id
 
-        game_map = GameMap(self.config.game.map_config)
+        self.game_map = GameMap(self.config.game.map_config)
 
         self.obs_encoder = ObservationEncoder(
-            game_map, self.config.game.max_players,
+            self.game_map, self.config.game.max_players,
             max_troops=self.config.observation.max_troops,
             max_growth=self.config.observation.max_growth,
             cmd_max=self.config.observation.cmd_max,
             use_adjacency=getattr(self.config.observation, "use_adjacency", False),
         )
         self.act_encoder = ActionEncoder(
-            game_map,
+            self.game_map,
             troop_buckets=tuple(self.config.action.troop_buckets),
         )
         self.rewards: List[BaseRewardFunction] = build_reward_functions(self.config.reward)
@@ -79,7 +79,7 @@ class LwgEnv(gym.Env):
     def step(self, action: int) -> Tuple[np.ndarray, float, bool, bool, dict]:
         assert self._state is not None, "call reset() before step()"
 
-        cmd = self.act_encoder.decode(action, player_id=self.agent_id, game_map=self._state.game_map)
+        cmd = self.act_encoder.decode(action, player_id=self.agent_id, game_map=self.game_map)
         max_cmds = self._max_cmds()
 
         if cmd is not None:
@@ -138,7 +138,7 @@ class LwgEnv(gym.Env):
     def _max_cmds(self) -> int:
         assert self._state is not None
         owned = sum(
-            1 for r in self._state.game_map.regions[1:]
+            1 for r in self.game_map.regions[1:]
             if r is not None and r.owner == self.agent_id
         )
         return max_commands(owned)
