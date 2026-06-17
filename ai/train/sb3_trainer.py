@@ -57,8 +57,9 @@ class Sb3Trainer:
     # ------------------------------------------------------------------
 
     def create_env(self) -> VecEnv:
+        scenario = self.args.scenario
         return VecMonitor(
-            make_vec_env(lambda: LwgEnv(self.args.scenario), n_envs=self.args.n_envs,
+            make_vec_env(lambda: LwgEnv(scenario), n_envs=self.args.n_envs,
                          vec_env_cls=SubprocVecEnv, monitor_kwargs=None),
             info_keywords=("win", "turn"),
         )
