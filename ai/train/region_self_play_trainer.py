@@ -52,6 +52,12 @@ class RegionSelfPlayTrainer(SelfPlayTrainer):
             self._win_cbs[R] = WinRateCallback(window=self.args.win_rate_window)
             self._agent_elos[R] = 1200.0
 
+    def _opponent_id(self) -> int:
+        env = self.envs[self._regions[0]]
+        agent_id: int = env.get_attr("agent_id")[0]
+        num_players: int = env.get_attr("config")[0].game.num_players
+        return next(p for p in range(1, num_players + 1) if p != agent_id)
+
     # ------------------------------------------------------------------
     # Opponent sampling (region-aware override)
     # ------------------------------------------------------------------
@@ -96,6 +102,7 @@ class RegionSelfPlayTrainer(SelfPlayTrainer):
             )
         per_opponent = n_envs // n_opponents
 
+        opponent_id = self._opponent_id()
         total = self.args.total_timesteps
         chunk = self.args.checkpoint_freq
 
@@ -108,7 +115,7 @@ class RegionSelfPlayTrainer(SelfPlayTrainer):
             round_specs: dict[int, list[dict]] = {}
             for R in active:
                 round_specs[R] = self._sample_opponent_specs(
-                    self.pool, n_opponents, opponent_id=2, exclude_region=R)
+                    self.pool, n_opponents, opponent_id=opponent_id, exclude_region=R)
 
             # Phase 2: train all regions in parallel
             def _train_chunk(R: int) -> None:
