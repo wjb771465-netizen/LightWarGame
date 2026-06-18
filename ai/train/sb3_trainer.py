@@ -7,6 +7,10 @@ import random
 from stable_baselines3.common.env_util import make_vec_env
 from stable_baselines3.common.vec_env import SubprocVecEnv, VecEnv, VecMonitor
 
+import torch.nn.init as init
+
+from ai.algos.gnn import adj_to_edge_index
+from ai.algos.extractors import GNNExtractor
 from ai.algos.policy import SB3Policy
 from ai.envs.env import LwgEnv
 from ai.train.metrics import WinRateCallback
@@ -53,6 +57,17 @@ class Sb3Trainer:
 
 
     def create_env(self) -> VecEnv:
+        # --use-gnn 要求 YAML 里 use_adjacency: false
+        if self.args.use_gnn or self.args.use_transformer:
+            from ai.envs.utils import parse_config
+            cfg = parse_config(self.args.scenario)
+            if getattr(cfg.observation, "use_adjacency", False):
+                raise ValueError(
+                    f"--use-gnn/--use-transformer requires use_adjacency: false "
+                    f"in YAML config, but got true. "
+                    f"Edit the observation section of your scenario config."
+                )
+
         scenario = self.args.scenario
 
         def _wrap_env():
@@ -87,7 +102,30 @@ class Sb3Trainer:
         resume = getattr(self.args, "resume_from", None)
         if resume:
             return SB3Policy(path=resume, env=env)
-        return SB3Policy(env=env, args=self.args, tb_log_dir=tb_log_dir)
+
+        policy_kwargs: dict = {}
+
+        if self.args.use_gnn:
+            obs_encoder = env.get_attr("obs_encoder")[0]
+            map_template = env.get_attr("map_template")[0]
+            edge_index = adj_to_edge_index(map_template.adjacency_matrix)
+            policy_kwargs.update(
+                features_extractor_class=GNNExtractor,
+                features_extractor_kwargs=dict(
+                    num_regions=len(map_template.regions) - 1,
+                    feat_dim=obs_encoder._F,
+                    global_dim=obs_encoder._G,
+                    edge_index=edge_index,
+                    hidden_channels=self.args.gnn_hidden_channels,
+                ),
+            )
+
+        policy_kwargs["net_arch"] = self.args.net_arch
+
+        agent = SB3Policy(env=env, args=self.args, policy_kwargs=policy_kwargs,
+                          tb_log_dir=tb_log_dir)
+
+        return agent
 
 
     def eval(self, ckpt: str, step: int, region: int | None = None) -> list:

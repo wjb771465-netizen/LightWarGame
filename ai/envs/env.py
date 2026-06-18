@@ -35,17 +35,17 @@ class LwgEnv(gym.Env):
         self.config = parse_config(config_name)
         self.agent_id = agent_id
 
-        game_map = GameMap(self.config.game.map_config)
+        self.map_template = GameMap(self.config.game.map_config)
 
         self.obs_encoder = ObservationEncoder(
-            game_map, self.config.game.max_players,
+            self.map_template, self.config.game.max_players,
             max_troops=self.config.observation.max_troops,
             max_growth=self.config.observation.max_growth,
             cmd_max=self.config.observation.cmd_max,
             use_adjacency=getattr(self.config.observation, "use_adjacency", False),
         )
         self.act_encoder = ActionEncoder(
-            game_map,
+            self.map_template,
             troop_buckets=tuple(self.config.action.troop_buckets),
         )
         self.rewards: List[BaseRewardFunction] = build_reward_functions(self.config.reward)

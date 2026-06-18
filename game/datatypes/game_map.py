@@ -3,6 +3,8 @@ from __future__ import annotations
 import random
 from typing import Any, Dict, List, Optional, Sequence
 
+import numpy as np
+
 from game.constants import NEUTRAL_GROWTH
 from game.utils import parse_map_config
 
@@ -124,6 +126,23 @@ class GameMap:
         return not any(
             self.regions[n] is not None and self.regions[n].owner == r.owner for n in r.adjacent
         )
+
+    @property
+    def adjacency_matrix(self) -> np.ndarray:
+        """返回 0-indexed 邻接矩阵，shape=(N, N)，dtype=float32。
+
+        mat[i-1][j-1] == 1.0 当且仅当 region i 与 region j 相邻。对角线为 0。
+        """
+        n = len(self.regions) - 1  # 跳过 index 0
+        mat = np.zeros((n, n), dtype=np.float32)
+        for i in range(1, n + 1):
+            r = self.regions[i]
+            if r is None:
+                continue
+            for j in r.adjacent:
+                if self.valid_id(j):
+                    mat[i - 1][j - 1] = 1.0
+        return mat
 
     def troop_growth(self) -> None:
         for i in range(1, len(self.regions)):
