@@ -35,9 +35,7 @@ conda run --no-capture-output -n chinese_war_game \
   --clip-range             0.2 \
   --checkpoint-freq        16384 \
   --win-rate-window        200 \
-  --use-eval \
   --eval-opponent          random \
-  --eval-episodes          20 \
   --seed                   42 \
   --wandb \
   "$@"
