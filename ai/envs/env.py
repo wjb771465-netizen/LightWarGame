@@ -121,6 +121,7 @@ class LwgEnv(gym.Env):
         if terminated or truncated:
             winner = self._state.winner()
             info["win"] = 1.0 if winner == self.agent_id else 0.0
+            info["score"] = 0.5 if (truncated and not terminated) else info["win"]
             info["turn"] = self._episode_steps
 
         return obs, reward, terminated, truncated, info

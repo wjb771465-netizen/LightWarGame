@@ -136,8 +136,8 @@ class OpponentPool:
 
     @staticmethod
     def _compute_score(r) -> float:
-        """从评估结果计算 agent 实际得分（1=胜, 0.5=平, 0=负）。"""
-        return (r.wins + 0.5 * r.draws) / r.episodes if r.episodes > 0 else 0.0
+        """从 EvalResult 提取 agent 得分（= score / episodes）。"""
+        return r.score / r.episodes if r.episodes > 0 else 0.0
 
     @staticmethod
     def _parse_step_from_spec(spec: dict) -> int | None:
