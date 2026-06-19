@@ -16,6 +16,7 @@ from ai.train.utils import (
     checkpoint_path,
     extract_ckpt_step,
     final_model_path,
+    format_eval_specs,
     resolve_save_dir,
     set_seeds,
 )
@@ -197,8 +198,9 @@ class RegionSelfPlayTrainer(SelfPlayTrainer):
 
         from ai.train.eval import evaluate, aggregate_win_rate, aggregate_avg_turns
 
-        logging.info("[Eval R=%d] step=%d n=%d eps=%d",
-                     R, step, len(specs), self.args.eval_episodes)
+        summary = format_eval_specs(specs)
+        logging.info("[Eval R=%d] step=%d n=%d eps=%d [%s]",
+                     R, step, len(specs), self.args.eval_episodes, summary)
 
         eval_env = self.eval_envs[R]
         for i in range(min(len(specs), eval_env.num_envs)):
