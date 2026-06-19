@@ -31,7 +31,7 @@ class Sb3Trainer:
         self.save_dir = resolve_save_dir(args.scenario, args.save_dir)
         os.makedirs(self.save_dir, exist_ok=True)
         set_seeds(args.seed)
-        self.env = self.create_env()
+        self.env, self.eval_env = self.create_envs()
         self.agent = self.create_agent(self.env, tb_log_dir=self.save_dir)
         self._win_cb = WinRateCallback(window=self.args.win_rate_window)
 
@@ -56,8 +56,8 @@ class Sb3Trainer:
         self.render(final, save_dir=self.save_dir)
 
 
-    def create_env(self) -> VecEnv:
-        # --use-gnn 要求 YAML 里 use_adjacency: false
+    def create_envs(self) -> tuple[VecEnv, VecEnv]:
+        """一次创建训练 + 评估两个 VecEnv。"""
         if self.args.use_gnn or self.args.use_transformer:
             from ai.envs.utils import parse_config
             cfg = parse_config(self.args.scenario)
@@ -68,12 +68,17 @@ class Sb3Trainer:
                     f"Edit the observation section of your scenario config."
                 )
 
+        eval_n = self.args.eval_n_envs or self.args.n_envs
+        return self._build_venv(self.args.n_envs), self._build_venv(eval_n)
+
+    def _build_venv(self, n_envs: int) -> VecEnv:
         scenario = self.args.scenario
 
         def _wrap_env():
             import sys, traceback as _tb
+            import torch as _torch
+            _torch.set_num_threads(1)
             env = LwgEnv(scenario)
-            # 给所有 Gym API 方法包一层异常捕获，确保 traceback 进 stderr
             for _attr in ("step", "reset", "action_masks", "render", "close",
                           "set_opponent", "set_capitals"):
                 _orig = getattr(env, _attr, None)
@@ -93,7 +98,7 @@ class Sb3Trainer:
             return env
 
         return VecMonitor(
-            make_vec_env(_wrap_env, n_envs=self.args.n_envs,
+            make_vec_env(_wrap_env, n_envs=n_envs,
                          vec_env_cls=SubprocVecEnv, monitor_kwargs=None),
             info_keywords=("win", "turn"),
         )
@@ -143,8 +148,11 @@ class Sb3Trainer:
         summary = format_eval_specs(specs)
         logging.info("[Eval] step=%d n=%d eps=%d fixed=%s [%s]",
                      step, len(specs), self.args.eval_episodes, include_fixed, summary)
-        results = evaluate(ckpt, specs, self.args.scenario, self.args.eval_episodes,
-                           agent_capital=region)
+
+        for i in range(min(len(specs), self.eval_env.num_envs)):
+            self.eval_env.env_method("set_opponent", specs[i], indices=[i])
+
+        results = evaluate(ckpt, self.eval_env, self.args.eval_episodes, specs)
 
         by_type: dict[str, list] = {}
         for r in results:
