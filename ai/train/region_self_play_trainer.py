@@ -40,6 +40,7 @@ class RegionSelfPlayTrainer(SelfPlayTrainer):
 
         self.save_dirs: dict[int, str] = {}
         self.envs: dict[int, object] = {}
+        self.eval_envs: dict[int, object] = {}
         self.agents: dict[int, SB3Policy] = {}
         self._win_cbs: dict[int, WinRateCallback] = {}
         self._agent_elos: dict[int, float] = {}
@@ -47,7 +48,7 @@ class RegionSelfPlayTrainer(SelfPlayTrainer):
         for R in self._regions:
             self.save_dirs[R] = os.path.join(self.save_dir, f"region_{R}")
             os.makedirs(self.save_dirs[R], exist_ok=True)
-            self.envs[R] = self.create_env()
+            self.envs[R], self.eval_envs[R] = self.create_envs()
             self.agents[R] = self.create_agent(self.envs[R], tb_log_dir=self.save_dirs[R])
             self._win_cbs[R] = WinRateCallback(window=self.args.win_rate_window)
             self._agent_elos[R] = 1200.0
@@ -187,6 +188,42 @@ class RegionSelfPlayTrainer(SelfPlayTrainer):
             self.render(final_model_path(self.save_dirs[R]),
                         save_dir=self.save_dirs[R], agent_capital=R, opponent_capital=opp)
 
+
+    def eval(self, ckpt: str, step: int, region: int | None = None) -> list:
+        R = region
+        specs = self.choose_eval_opponents(region=R)
+        if not specs:
+            return []
+
+        from ai.train.eval import evaluate, aggregate_win_rate, aggregate_avg_turns
+
+        logging.info("[Eval R=%d] step=%d n=%d eps=%d",
+                     R, step, len(specs), self.args.eval_episodes)
+
+        eval_env = self.eval_envs[R]
+        for i in range(min(len(specs), eval_env.num_envs)):
+            spec = specs[i]
+            eval_env.env_method("set_opponent", spec, indices=[i])
+            opp_region = spec.get("opp_region")
+            if opp_region is None:
+                opp_region = random.choice([r for r in self._regions if r != R])
+            eval_env.env_method("set_capitals", R, opp_region, indices=[i])
+
+        results = evaluate(ckpt, eval_env, self.args.eval_episodes, specs)
+
+        by_type: dict[str, list] = {}
+        for r in results:
+            t = r.opponent_spec["type"]
+            if t == "policy":
+                continue
+            by_type.setdefault(t, []).append(r)
+        for opp_type, group in by_type.items():
+            self.log_eval_metrics({
+                f"vs_{opp_type}/win_rate": aggregate_win_rate(group),
+                f"vs_{opp_type}/avg_turns": aggregate_avg_turns(group),
+            }, step, region=R)
+
+        return results
 
     def choose_eval_opponents(self, include_fixed: bool = True, region: int | None = None) -> list[dict]:
         """从 RegionPool 采样 eval 对手 + 可选固定对手。"""
