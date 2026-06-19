@@ -23,7 +23,8 @@ from ai.algos.policy import SB3Policy
 
 @dataclass
 class EvalResult:
-    """单个 eval env 的对局结果。score = 胜局数 + 0.5×平局数。"""
+    """单个 eval env 的对局结果。win=info['win'] 求和, score=info['score'] 求和。"""
+    win: float
     score: float
     episodes: int
     win_rate: float
@@ -56,6 +57,7 @@ def evaluate(
 
     agent = SB3Policy(path=agent_path)
 
+    wins = [0.0] * n
     scores = [0.0] * n
     turn_sums = [0] * n
     episode_counts = [0] * n
@@ -75,16 +77,17 @@ def evaluate(
                 episode_counts[i] += 1
                 info = infos[i]
                 turn_sums[i] += info.get("turn", 0)
+                wins[i] += info.get("win", 0.0)
                 scores[i] += info.get("score", info.get("win", 0.0))
 
     results = []
     for i in range(n):
         eps = episode_counts[i]
-        sc = scores[i]
         results.append(EvalResult(
-            score=sc,
+            win=wins[i],
+            score=scores[i],
             episodes=eps,
-            win_rate=sc / eps if eps > 0 else 0.0,
+            win_rate=scores[i] / eps if eps > 0 else 0.0,
             avg_turns=turn_sums[i] / eps if eps > 0 else None,
             opponent_spec=opponent_specs[i % len(opponent_specs)],
         ))
@@ -97,7 +100,7 @@ def aggregate_win_rate(results: list[EvalResult]) -> float:
     valid = [r for r in results if r.episodes > 0]
     if not valid:
         return 0.0
-    return sum(r.wins for r in valid) / sum(r.episodes for r in valid)
+    return sum(r.win for r in valid) / sum(r.episodes for r in valid)
 
 
 def aggregate_avg_turns(results: list[EvalResult]) -> float | None:
