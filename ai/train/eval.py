@@ -23,10 +23,8 @@ from ai.algos.policy import SB3Policy
 
 @dataclass
 class EvalResult:
-    """单个 eval env 的对局结果。"""
-    wins: int
-    losses: int
-    draws: int
+    """单个 eval env 的对局结果。score = 胜局数 + 0.5×平局数。"""
+    score: float
     episodes: int
     win_rate: float
     avg_turns: float | None
@@ -58,8 +56,7 @@ def evaluate(
 
     agent = SB3Policy(path=agent_path)
 
-    wins = [0] * n
-    losses = [0] * n
+    scores = [0.0] * n
     turn_sums = [0] * n
     episode_counts = [0] * n
 
@@ -78,20 +75,16 @@ def evaluate(
                 episode_counts[i] += 1
                 info = infos[i]
                 turn_sums[i] += info.get("turn", 0)
-                if info.get("win", 0.0) == 1.0:
-                    wins[i] += 1
-                else:
-                    losses[i] += 1
+                scores[i] += info.get("score", info.get("win", 0.0))
 
     results = []
     for i in range(n):
         eps = episode_counts[i]
+        sc = scores[i]
         results.append(EvalResult(
-            wins=wins[i],
-            losses=losses[i],
-            draws=0,
+            score=sc,
             episodes=eps,
-            win_rate=wins[i] / eps if eps > 0 else 0.0,
+            win_rate=sc / eps if eps > 0 else 0.0,
             avg_turns=turn_sums[i] / eps if eps > 0 else None,
             opponent_spec=opponent_specs[i % len(opponent_specs)],
         ))

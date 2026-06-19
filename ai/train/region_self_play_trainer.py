@@ -192,7 +192,11 @@ class RegionSelfPlayTrainer(SelfPlayTrainer):
 
     def eval(self, ckpt: str, step: int, region: int | None = None) -> list:
         R = region
-        specs = self.choose_eval_opponents(region=R)
+        freq = max(1, self.args.eval_opponent_freq)
+        ckpt_idx = step // max(1, self.args.checkpoint_freq)
+        include_fixed = self.args.eval_opponent and (ckpt_idx % freq == 0)
+
+        specs = self.choose_eval_opponents(include_fixed=include_fixed, region=R)
         if not specs:
             return []
 

@@ -100,7 +100,7 @@ class Sb3Trainer:
         return VecMonitor(
             make_vec_env(_wrap_env, n_envs=n_envs,
                          vec_env_cls=SubprocVecEnv, monitor_kwargs=None),
-            info_keywords=("win", "turn"),
+            info_keywords=("win", "turn", "score"),
         )
 
     def create_agent(self, env: VecEnv, tb_log_dir: str) -> SB3Policy:
