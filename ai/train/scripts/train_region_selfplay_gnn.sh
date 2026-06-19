@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
-# GNN 骨架训练（GraphSAGE，随机首都）
-# 用法：bash ai/train/scripts/train_gnn.sh [额外参数]
+# GNN 地区自博弈训练（GraphSAGE，PFSP progress 采样）
+# 用法：bash ai/train/scripts/train_region_selfplay_gnn.sh [额外参数]
 set -euo pipefail
 
-SCENARIO="duel/vsbaseline_no_adj"
-EXP_NAME="gnn256x128"
+SCENARIO="duel/region_selfplay_no_adj"
+EXP_NAME="gnn_pfsp_4_20"
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 source "$SCRIPT_DIR/snapshot.sh"
@@ -23,19 +23,30 @@ conda run --no-capture-output -n chinese_war_game \
   --exp-name               "$EXP_NAME" \
   --save-dir               "$SAVE_DIR" \
   --use-gnn \
-  --net-arch               256 128 \
   --gnn-hidden-channels    128 \
-  --total-timesteps        10000000 \
+  --net-arch               256 128 \
+  --region-self-play \
+  --region-self-play-regions 4,20 \
+  --self-play-pool-size    100 \
+  --self-play-initial-opponent rule \
+  --pool-sampling-strategy progress \
+  --use-eval \
+  --eval-episodes          20 \
+  --eval-opponent          random,rule,fsm \
+  --eval-n-envs             6 \
+  --eval-opponent-freq     20 \
+  --total-timesteps        5000000 \
   --n-steps                2048 \
-  --batch-size             256 \
+  --batch-size             512 \
   --n-epochs               10 \
-  --lr                     2e-4 \
+  --lr                     3e-4 \
   --gamma                  0.99 \
   --gae-lambda             0.97 \
   --clip-range             0.2 \
   --checkpoint-freq        16384 \
   --win-rate-window        200 \
-  --eval-opponent          random \
   --seed                   42 \
+  --parallel-regions       2 \
+  --n-training-threads     4 \
   --wandb \
   "$@"
