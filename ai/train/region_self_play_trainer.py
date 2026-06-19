@@ -16,7 +16,6 @@ from ai.train.utils import (
     checkpoint_path,
     extract_ckpt_step,
     final_model_path,
-    format_eval_specs,
     resolve_save_dir,
     set_seeds,
 )
@@ -188,46 +187,6 @@ class RegionSelfPlayTrainer(SelfPlayTrainer):
             self.render(final_model_path(self.save_dirs[R]),
                         save_dir=self.save_dirs[R], agent_capital=R, opponent_capital=opp)
 
-
-    def eval(self, ckpt: str, step: int, region: int | None = None) -> list:
-        freq = max(1, self.args.eval_opponent_freq)
-        ckpt_idx = step // max(1, self.args.checkpoint_freq)
-        include_fixed = self.args.eval_opponent and (ckpt_idx % freq == 0)
-
-        R = region
-        specs = self.choose_eval_opponents(include_fixed=include_fixed, region=R)
-        if not specs:
-            return []
-
-        from ai.train.eval import evaluate, aggregate_win_rate, aggregate_avg_turns
-
-        summary = format_eval_specs(specs)
-        logging.info("[Eval R=%d] step=%d n=%d eps=%d fixed=%s [%s]",
-                     R, step, len(specs), self.args.eval_episodes, include_fixed, summary)
-
-        env = self.envs[R]
-        for i, spec in enumerate(specs):
-            env.env_method("set_opponent", spec, indices=[i])
-            opp_region = spec.get("opp_region")
-            if opp_region is None:
-                opp_region = random.choice([r for r in self._regions if r != R])
-            env.env_method("set_capitals", R, opp_region, indices=[i])
-
-        results = evaluate(ckpt, env, self.args.eval_episodes, specs)
-
-        by_type: dict[str, list] = {}
-        for r in results:
-            t = r.opponent_spec["type"]
-            if t == "policy":
-                continue
-            by_type.setdefault(t, []).append(r)
-        for opp_type, group in by_type.items():
-            self.log_eval_metrics({
-                f"vs_{opp_type}/win_rate": aggregate_win_rate(group),
-                f"vs_{opp_type}/avg_turns": aggregate_avg_turns(group),
-            }, step, region=R)
-
-        return results
 
     def choose_eval_opponents(self, include_fixed: bool = True, region: int | None = None) -> list[dict]:
         """从 RegionPool 采样 eval 对手 + 可选固定对手。"""
