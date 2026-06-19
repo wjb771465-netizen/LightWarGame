@@ -16,6 +16,7 @@ from ai.train.utils import (
     checkpoint_path,
     extract_ckpt_step,
     final_model_path,
+    format_eval_specs,
     resolve_save_dir,
     set_seeds,
 )
@@ -203,7 +204,16 @@ class RegionSelfPlayTrainer(SelfPlayTrainer):
         summary = format_eval_specs(specs)
         logging.info("[Eval R=%d] step=%d n=%d eps=%d fixed=%s [%s]",
                      R, step, len(specs), self.args.eval_episodes, include_fixed, summary)
-        results = evaluate(ckpt, self.envs[R], self.args.eval_episodes, specs)
+
+        env = self.envs[R]
+        for i, spec in enumerate(specs):
+            env.env_method("set_opponent", spec, indices=[i])
+            opp_region = spec.get("opp_region")
+            if opp_region is None:
+                opp_region = random.choice([r for r in self._regions if r != R])
+            env.env_method("set_capitals", R, opp_region, indices=[i])
+
+        results = evaluate(ckpt, env, self.args.eval_episodes, specs)
 
         by_type: dict[str, list] = {}
         for r in results:
