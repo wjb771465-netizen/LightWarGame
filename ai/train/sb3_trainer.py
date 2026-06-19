@@ -143,8 +143,7 @@ class Sb3Trainer:
         summary = format_eval_specs(specs)
         logging.info("[Eval] step=%d n=%d eps=%d fixed=%s [%s]",
                      step, len(specs), self.args.eval_episodes, include_fixed, summary)
-        results = evaluate(ckpt, specs, self.args.scenario, self.args.eval_episodes,
-                           agent_capital=region)
+        results = evaluate(ckpt, self.env, self.args.eval_episodes, specs)
 
         by_type: dict[str, list] = {}
         for r in results:
