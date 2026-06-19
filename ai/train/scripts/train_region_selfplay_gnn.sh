@@ -35,7 +35,7 @@ conda run --no-capture-output -n chinese_war_game \
   --eval-opponent          random,rule,fsm \
   --eval-n-envs             6 \
   --eval-opponent-freq     20 \
-  --total-timesteps        5000000 \
+  --total-timesteps        10000000 \
   --n-steps                2048 \
   --batch-size             512 \
   --n-epochs               10 \
