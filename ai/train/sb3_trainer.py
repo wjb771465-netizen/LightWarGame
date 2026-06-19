@@ -7,6 +7,8 @@ import random
 from stable_baselines3.common.env_util import make_vec_env
 from stable_baselines3.common.vec_env import SubprocVecEnv, VecEnv, VecMonitor
 
+import torch.nn.init as init
+
 from ai.algos.gnn import adj_to_edge_index
 from ai.algos.extractors import GNNExtractor
 from ai.algos.policy import SB3Policy
@@ -120,8 +122,10 @@ class Sb3Trainer:
 
         policy_kwargs["net_arch"] = self.args.net_arch
 
-        return SB3Policy(env=env, args=self.args, policy_kwargs=policy_kwargs,
-                         tb_log_dir=tb_log_dir)
+        agent = SB3Policy(env=env, args=self.args, policy_kwargs=policy_kwargs,
+                          tb_log_dir=tb_log_dir)
+
+        return agent
 
 
     def eval(self, ckpt: str, step: int, region: int | None = None) -> list:
