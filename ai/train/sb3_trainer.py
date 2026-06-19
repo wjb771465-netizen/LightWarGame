@@ -107,12 +107,12 @@ class Sb3Trainer:
 
         if self.args.use_gnn:
             obs_encoder = env.get_attr("obs_encoder")[0]
-            game_map = env.get_attr("game_map")[0]
-            edge_index = adj_to_edge_index(game_map.adjacency_matrix)
+            map_template = env.get_attr("map_template")[0]
+            edge_index = adj_to_edge_index(map_template.adjacency_matrix)
             policy_kwargs.update(
                 features_extractor_class=GNNExtractor,
                 features_extractor_kwargs=dict(
-                    num_regions=len(game_map.regions) - 1,
+                    num_regions=len(map_template.regions) - 1,
                     feat_dim=obs_encoder._F,
                     global_dim=obs_encoder._G,
                     edge_index=edge_index,

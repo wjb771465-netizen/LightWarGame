@@ -1,13 +1,9 @@
-"""GNN 训练诊断：打印参数变化、梯度流、特征统计到日志文件。
+"""GNN 训练诊断：继承 Sb3Trainer，超参写死，打印参数变化/梯度流/特征统计到日志。
 
 用法:
-  conda run -n chinese_war_game python -m ai.train.gnn_diagnose \
-    --scenario duel/vsbaseline_gnn_fixed --use-gnn --gnn-hidden-channels 128 \
-    --net-arch 128 --total-timesteps 16384 --n-steps 2048 --batch-size 512 \
-    --n-epochs 10 --lr 3e-4 --gamma 0.99 --gae-lambda 0.97 --clip-range 0.2 \
-    --seed 42
+  conda run -n chinese_war_game python -m ai.train.gnn_diagnose
 
-输出: ai/train/results/<scenario>/gnn_diag_<timestamp>.log
+输出: ai/train/results/duel/vsbaseline_gnn_fixed/gnn_diag_<timestamp>.log
 """
 
 from __future__ import annotations
@@ -51,7 +47,6 @@ def _start_log(filepath: str) -> None:
     _LOG_STREAM = io.StringIO()
     _LOG_PATH = filepath
     os.makedirs(os.path.dirname(filepath), exist_ok=True)
-    # 新建文件，写入头部
     with open(filepath, "w") as f:
         f.write(f"# GNN diagnose log — {datetime.now().isoformat()}\n")
         f.write(f"# PID={os.getpid()}\n\n")
@@ -156,6 +151,9 @@ class GnnDiagnoseCallback(BaseCallback):
     def __init__(self, log_interval: int = 1, verbose: int = 0):
         super().__init__(verbose)
         self.log_interval = log_interval
+
+    def _on_step(self) -> bool:
+        return True
 
     def _on_training_start(self) -> None:
         _log("=" * 70)
@@ -330,7 +328,7 @@ def diagnose_logits(model, env, n_steps: int = 512) -> None:
             obs = env.reset()
 
     logits_all = np.concatenate(logits_list, axis=0)  # (total_steps, action_dim)
-
+    masks_all = np.concatenate(masks_list, axis=0)
     _log(f"  logits shape: {logits_all.shape}")
     _log(f"  logits mean: {logits_all.mean():.4f}")
     _log(f"  logits std (across actions): {logits_all.std(axis=1).mean():.4f}")
@@ -355,188 +353,155 @@ def diagnose_logits(model, env, n_steps: int = 512) -> None:
     _log(f"  entropy: mean={entropy.mean():.4f}  (max possible={max_entropy:.4f})")
 
     # Mask statistics
-    masks_all = np.concatenate(masks_list, axis=0)
     masked_count = (masks_all == 0).sum(axis=1)
     total_actions = masks_all.shape[1]
     _log(f"  mask: avg masked actions = {masked_count.mean():.1f} / {total_actions}")
     _log(f"        only no-op available = {(masked_count == total_actions - 1).mean()*100:.1f}%")
 
 
-# ── main ─────────────────────────────────────────────────────────────────
+# ── GnnDebugTrainer ──────────────────────────────────────────────────────
 
-def main() -> None:
-    import argparse
+from types import SimpleNamespace
 
-    from ai.train.args import get_config
-    from ai.envs.env import LwgEnv
-    from ai.envs.utils import parse_config
-    from ai.algos.extractors import GNNExtractor
-    from ai.algos.gnn import adj_to_edge_index
-    from ai.algos.policy import SB3Policy
-    from ai.train.utils import resolve_save_dir
+from ai.train.sb3_trainer import Sb3Trainer
 
-    args = get_config().parse_args()
-    if not args.use_gnn:
-        _log("ERROR: --use-gnn is required for this diagnostic")
-        sys.exit(1)
 
-    # 日志路径
-    scenario_dir = resolve_save_dir(args.scenario, args.save_dir)
-    ts = datetime.now().strftime("%Y%m%d_%H%M%S")
-    log_path = os.path.join(scenario_dir, f"gnn_diag_{ts}.log")
-    _start_log(log_path)
-    _log(f"Log: {log_path}")
+class GnnDebugTrainer(Sb3Trainer):
+    """继承 Sb3Trainer，超参写死，打印参数变化/梯度流/激活统计到日志。"""
 
-    # 构建环境
-    _log("Building env...")
-    cfg = parse_config(args.scenario)
-    env = LwgEnv(args.scenario)
+    def __init__(self) -> None:
+        args = SimpleNamespace(
+            scenario="duel/vsbaseline_gnn_fixed",
+            save_dir=None,
+            seed=42,
+            use_gnn=True,
+            use_transformer=False,
+            gnn_hidden_channels=128,
+            net_arch=[128],
+            n_envs=1,
+            n_steps=2048,
+            batch_size=512,
+            n_epochs=10,
+            lr=3e-4,
+            gamma=0.99,
+            gae_lambda=0.97,
+            clip_range=0.2,
+            total_timesteps=8192,
+            checkpoint_freq=4096,
+            use_eval=False,
+            wandb=False,
+            eval_opponent="",
+            win_rate_window=200,
+            eval_opponent_freq=1,
+            eval_episodes=100,
+            eval_n_envs=1,
+            eval_opponent_path="",
+            exp_name=None,
+            wandb_project=None,
+            resume_from=None,
+        )
 
-    # 构建模型
-    game_map = env.game_map
-    obs_encoder = env.obs_encoder
-    edge_index = adj_to_edge_index(game_map.adjacency_matrix)
+        super().__init__(args)
 
-    policy_kwargs = dict(
-        features_extractor_class=GNNExtractor,
-        features_extractor_kwargs=dict(
-            num_regions=len(game_map.regions) - 1,
-            feat_dim=obs_encoder._F,
-            global_dim=obs_encoder._G,
-            edge_index=edge_index,
-            hidden_channels=args.gnn_hidden_channels,
-        ),
-        net_arch=args.net_arch,
-    )
+        # 日志路径（必须在 super().__init__ 之后，因为 resolve_save_dir 生成时间戳）
+        ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+        log_path = os.path.join(self.save_dir, f"gnn_diag_{ts}.log")
+        self._log_path = log_path
 
-    _log("\n── Policy kwargs ──")
-    for k, v in policy_kwargs.items():
-        if k == "features_extractor_kwargs":
-            for kk, vv in v.items():
-                if kk != "edge_index":
-                    _log(f"  {kk}: {vv}")
+        _start_log(log_path)
+        _log(f"Log: {log_path}")
+        _log(f"Scenario: {args.scenario}")
+        _log(f"GNN hidden: {args.gnn_hidden_channels}  net_arch: {args.net_arch}")
+        _log(f"Total timesteps: {args.total_timesteps}  n_steps: {args.n_steps}  batch: {args.batch_size}")
+        _log(f"lr: {args.lr}  gamma: {args.gamma}  gae_lambda: {args.gae_lambda}")
+
+        _set_ref_snapshot(self.agent._model)
+
+    def train(self) -> None:
+        model = self.agent._model
+        venv = self.env
+
+        # ── Phase 1: Optimizer check ──
+        _log("\n── 1. Optimizer check ──")
+        try:
+            opt = model.policy.optimizer
+        except AttributeError:
+            _log("  model.policy.optimizer not found")
+            opt = None
+        if opt is not None:
+            opt_params = set()
+            for pg in opt.param_groups:
+                for p in pg["params"]:
+                    opt_params.add(id(p))
+            all_params = [p for p in model.policy.parameters()]
+            missing = [p for p in all_params if id(p) not in opt_params]
+            if missing:
+                _log(f"  ⚠️  {len(missing)}/{len(all_params)} params NOT in optimizer!")
+                for p in missing[:5]:
+                    _log(f"    shape={tuple(p.shape)} requires_grad={p.requires_grad}")
+            else:
+                _log(f"  ✓ all {len(all_params)} params in optimizer")
+
+            gnn_params = [p for n, p in model.policy.named_parameters()
+                          if n.startswith("features_extractor.backbone.")]
+            gnn_in_opt = [p for p in gnn_params if id(p) in opt_params]
+            _log(f"  GNN backbone: {len(gnn_in_opt)}/{len(gnn_params)} params in optimizer")
         else:
-            _log(f"  {k}: {v}")
+            _log("  SKIP (no access to optimizer)")
 
-    _log("\n── Building MaskablePPO with GNNExtractor ──")
-    from stable_baselines3.common.env_util import make_vec_env
-    from stable_baselines3.common.vec_env import SubprocVecEnv
+        # ── Phase 2: Forward diagnosis ──
+        diagnose_activations(model, venv)
+        diagnose_logits(model, venv)
 
-    def _mk_env():
-        e = LwgEnv(args.scenario)
-        return e
+        # ── Phase 3: Short training with gradient capture ──
+        total = self.args.total_timesteps
+        _log(f"\n── 2. Training {total} steps with gradient hooks ──")
 
-    venv = make_vec_env(_mk_env, n_envs=1, vec_env_cls=SubprocVecEnv)
+        _install_bwd_hooks(model.policy)
+        callback = GnnDiagnoseCallback(log_interval=1)
+        model.learn(total_timesteps=total, callback=callback, reset_num_timesteps=True)
 
-    model_cls = None
-    try:
-        from sb3_contrib import MaskablePPO
-        model_cls = MaskablePPO
-    except ImportError:
-        from stable_baselines3 import PPO
-        model_cls = PPO
-        _log("WARNING: sb3_contrib not found, using vanilla PPO (no action masking)")
+        if _GRAD_STATS:
+            _log(f"\n── Backward gradient stats (collected during training) ──")
+            for name, values in sorted(_GRAD_STATS.items()):
+                arr = np.array(values)
+                _log(f"  {name:50s} n={len(arr):4d}  mean|g|={arr.mean():.6e}  last|g|={arr[-1]:.6e}")
+            zero_grads = [n for n, v in _GRAD_STATS.items() if np.array(v).mean() < 1e-15]
+            if zero_grads:
+                _log(f"\n  ⚠️  ZERO GRADIENT params ({len(zero_grads)}):")
+                for n in zero_grads[:10]:
+                    _log(f"    {n}")
+            else:
+                _log("  ✓ all params received non-zero gradients at some point")
 
-    model = model_cls(
-        "MlpPolicy", venv,
-        policy_kwargs=policy_kwargs,
-        n_steps=getattr(args, "n_steps", 2048),
-        batch_size=getattr(args, "batch_size", 512),
-        n_epochs=getattr(args, "n_epochs", 10),
-        learning_rate=getattr(args, "lr", 3e-4),
-        gamma=getattr(args, "gamma", 0.99),
-        gae_lambda=getattr(args, "gae_lambda", 0.97),
-        clip_range=getattr(args, "clip_range", 0.2),
-        verbose=1,
-        seed=getattr(args, "seed", 42),
-    )
+        _remove_bwd_hooks()
 
-    _set_ref_snapshot(model)
-
-    # ── Phase 1: One-time checks ──
-    _log("\n── 1. Optimizer check ──")
-    try:
-        opt = model.policy.optimizer
-    except AttributeError:
-        _log("  model.policy.optimizer not found")
-        opt = None
-    if opt is not None:
-        opt_params = set()
-        for pg in opt.param_groups:
-            for p in pg["params"]:
-                opt_params.add(id(p))
-        all_params = [p for p in model.policy.parameters()]
-        missing = [p for p in all_params if id(p) not in opt_params]
-        if missing:
-            _log(f"  ⚠️  {len(missing)}/{len(all_params)} params NOT in optimizer!")
-            for p in missing[:5]:
-                _log(f"    shape={tuple(p.shape)} requires_grad={p.requires_grad}")
+        # ── Phase 4: Final param check ──
+        _log(f"\n── 3. Final parameter Δ ──")
+        params = _param_tree(model.policy)
+        cur = _snapshot(params)
+        if _REF_SNAPSHOT is not None:
+            d = _delta(_REF_SNAPSHOT, cur)
+            _log("  Δ vs init:")
+            unchanged = []
+            for k in sorted(d):
+                v = d[k]
+                msg = f"    {k:40s} Δ={v:.6e}"
+                if v < 1e-12:
+                    msg += " *** ZERO"
+                    unchanged.append(k)
+                _log(msg)
+            if unchanged:
+                _log(f"\n  ⚠️  {len(unchanged)} groups had ZERO change — policy is frozen!")
+            else:
+                _log("  ✓ all param groups changed")
         else:
-            _log(f"  ✓ all {len(all_params)} params in optimizer")
+            _log("  (no ref snapshot)")
 
-        # Check GNN params specifically
-        gnn_params = [p for n, p in model.policy.named_parameters() if n.startswith("features_extractor.backbone.")]
-        gnn_in_opt = [p for p in gnn_params if id(p) in opt_params]
-        _log(f"  GNN backbone: {len(gnn_in_opt)}/{len(gnn_params)} params in optimizer")
-    else:
-        _log("  SKIP (no access to optimizer)")
-
-    # ── Phase 2: Forward diagnosis ──
-    diagnose_activations(model, env)
-    diagnose_logits(model, env)
-
-    # ── Phase 3: Short training with gradient capture ──
-    total = getattr(args, "total_timesteps", 4096)
-    _log(f"\n── 2. Training {total} steps with gradient hooks ──")
-
-    _install_bwd_hooks(model.policy)
-    callback = GnnDiagnoseCallback(log_interval=1)
-    model.learn(total_timesteps=total, callback=callback, reset_num_timesteps=True)
-
-    # Print collected backward grad stats
-    if _GRAD_STATS:
-        _log(f"\n── Backward gradient stats (collected during training) ──")
-        for name, values in sorted(_GRAD_STATS.items()):
-            arr = np.array(values)
-            _log(f"  {name:50s} n={len(arr):4d}  mean|g|={arr.mean():.6e}  last|g|={arr[-1]:.6e}")
-        # Flag zero-gradient params
-        zero_grads = [n for n, v in _GRAD_STATS.items() if np.array(v).mean() < 1e-15]
-        if zero_grads:
-            _log(f"\n  ⚠️  ZERO GRADIENT params ({len(zero_grads)}):")
-            for n in zero_grads[:10]:
-                _log(f"    {n}")
-        else:
-            _log("  ✓ all params received non-zero gradients at some point")
-
-    _remove_bwd_hooks()
-
-    # ── Phase 4: Final param check ──
-    _log(f"\n── 3. Final parameter Δ ──")
-    params = _param_tree(model.policy)
-    cur = _snapshot(params)
-    if _REF_SNAPSHOT is not None:
-        d = _delta(_REF_SNAPSHOT, cur)
-        _log("  Δ vs init:")
-        unchanged = []
-        for k in sorted(d):
-            v = d[k]
-            msg = f"    {k:40s} Δ={v:.6e}"
-            if v < 1e-12:
-                msg += " *** ZERO"
-                unchanged.append(k)
-            _log(msg)
-        if unchanged:
-            _log(f"\n  ⚠️  {len(unchanged)} groups had ZERO change — policy is frozen!")
-        else:
-            _log("  ✓ all param groups changed")
-    else:
-        _log("  (no ref snapshot)")
-
-    _log(f"\nLog saved to: {log_path}")
-    _stop_log()
-    env.close()
-    venv.close()
+        _log(f"\nLog saved to: {self._log_path}")
+        _stop_log()
+        venv.close()
 
 
 if __name__ == "__main__":
-    main()
+    GnnDebugTrainer().train()
