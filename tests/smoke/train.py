@@ -1,10 +1,10 @@
-"""训练冒烟测试：训一小段截断训练，检查梯度、参数变化、激活统计，判定 PASS/FAIL。
+"""训练冒烟测试：全流程覆盖——训练、保存、评估、渲染，检查梯度/参数/产物。
 
 用法:
-    conda run -n chinese_war_game python -m tests.smoke.train \
+    conda run -n chinese_war_game python -m tests.smoke.train \\
       --scenario duel/vsbaseline_no_adj --use-gnn
 
-    conda run -n chinese_war_game python -m tests.smoke.train \
+    conda run -n chinese_war_game python -m tests.smoke.train \\
       --scenario duel/vsbaseline
 
 输出: ai/train/results/<scenario>/smoke_<timestamp>.log
@@ -39,14 +39,14 @@ SMOKE_DEFAULTS = dict(
     seed=42,
     n_envs=1,
     checkpoint_freq=16384,
-    use_eval=False,
+    use_eval=True,
     wandb=False,
     save_dir=None,
-    eval_opponent="",
+    eval_opponent="random",
     eval_opponent_path="",
     win_rate_window=200,
     eval_opponent_freq=1,
-    eval_episodes=100,
+    eval_episodes=4,
     eval_n_envs=1,
     exp_name=None,
     wandb_project=None,
@@ -231,21 +231,8 @@ def _phase2_forward(model, env) -> None:
         _log(f"  ✓ {len(_FWD_STATS)} layers, all have non-zero variance")
 
 
-def _phase3_train(model) -> None:
-    """Phase 3: 训练 → 检查梯度 + 参数变化。"""
-    global _REF_SNAPSHOT
-
-    total = SMOKE_DEFAULTS["total_timesteps"]
-    _log(f"\n── Phase 3: Train {total} steps ──")
-
-    _REF_SNAPSHOT = _snapshot(_param_tree(model.policy))
-    _install_bwd_hooks(model.policy)
-
-    model.learn(total_timesteps=total, callback=SmokeCallback(),
-                reset_num_timesteps=True)
-
-    _remove_bwd_hooks()
-
+def _phase3_diagnostics(model) -> None:
+    """Phase 3: 梯度 + 参数变化检查。"""
     # 3a. 梯度
     _log("\n── 3a. Gradient check ──")
     if not _BWD_STATS:
@@ -274,9 +261,59 @@ def _phase3_train(model) -> None:
     else:
         _log(f"  ✓ all {len(d)} param groups changed")
 
-    # 打印明细
+    # 明细
     for k in sorted(d):
         _log(f"    {k:40s} Δ={d[k]:.6e}")
+
+
+def _phase4_artifacts(save_dir: str) -> None:
+    """Phase 4: 检查保存、评估、渲染产物。"""
+    from ai.train.utils import checkpoint_path, final_model_path
+
+    _log("\n── Phase 4: Artifact check (save + eval + render) ──")
+
+    # 4a. checkpoint
+    freq = SMOKE_DEFAULTS["checkpoint_freq"]
+    total = SMOKE_DEFAULTS["total_timesteps"]
+    for step in range(freq, total + 1, freq):
+        ckpt = checkpoint_path(save_dir, step) + ".zip"
+        if os.path.isfile(ckpt):
+            _log(f"  ✓ checkpoint: {os.path.relpath(ckpt)}")
+        else:
+            _fail(f"checkpoint missing: {os.path.relpath(ckpt)}")
+
+    # 4b. final model
+    final = final_model_path(save_dir) + ".zip"
+    if os.path.isfile(final):
+        _log(f"  ✓ final model: {os.path.relpath(final)}")
+    else:
+        _fail(f"final model missing: {os.path.relpath(final)}")
+
+    # 4c. tensorboard log
+    tb_dirs = [d for d in os.listdir(save_dir) if d.startswith("MaskablePPO")]
+    if tb_dirs:
+        _log(f"  ✓ tensorboard log: {tb_dirs[0]}")
+    else:
+        _fail("tensorboard log missing")
+
+    # 4d. render videos (nested under eval_videos/<type>/ep00/)
+    videos_dir = os.path.join(save_dir, "eval_videos")
+    if not os.path.isdir(videos_dir):
+        _fail(f"render videos dir missing: {os.path.relpath(videos_dir)}")
+        return
+
+    for opp_type in ["random"]:
+        opp_dir = os.path.join(videos_dir, opp_type)
+        if not os.path.isdir(opp_dir):
+            _fail(f"render video dir missing: {os.path.relpath(opp_dir)}")
+            continue
+        mp4s = []
+        for root, _dirs, files in os.walk(opp_dir):
+            mp4s.extend(f for f in files if f.endswith(".mp4"))
+        if mp4s:
+            _log(f"  ✓ render video vs {opp_type}: {len(mp4s)} mp4")
+        else:
+            _fail(f"no mp4 found in {os.path.relpath(opp_dir)}")
 
 
 def _verdict() -> None:
@@ -295,23 +332,48 @@ def _verdict() -> None:
 # ── SmokeTrainer ───────────────────────────────────────────────────────────
 
 class SmokeTrainer(Sb3Trainer):
-    """继承 Sb3Trainer，超参写死，跑完诊断后判定 PASS/FAIL。"""
+    """继承 Sb3Trainer，超参写死，跑全流程诊断后判定 PASS/FAIL。"""
 
     def __init__(self, args) -> None:
-        # 用冒烟默认值覆盖 CLI 传进来的超参
         for k, v in SMOKE_DEFAULTS.items():
             setattr(args, k, v)
         super().__init__(args)
 
     def train(self) -> None:
+        global _REF_SNAPSHOT
+
         model = self.agent._model
         env = self.env
 
         _phase1_structure(model)
         _phase2_forward(model, env)
-        _phase3_train(model)
-        _verdict()
 
+        # 训前快照 + backward hooks
+        _REF_SNAPSHOT = _snapshot(_param_tree(model.policy))
+        _install_bwd_hooks(model.policy)
+
+        # 全流程训练：save + eval + render
+        _log("\n── Phase 3: Training loop (save + eval + render) ──")
+        self._init_logging()
+        total = self.args.total_timesteps
+        chunk = self.args.checkpoint_freq
+        while self.agent.num_timesteps < total:
+            steps = min(chunk, total - self.agent.num_timesteps)
+            self.agent.learn(steps, callback=[self._win_cb])
+            self.agent._model._custom_logger = True
+            step = self.agent.num_timesteps
+            self.save(step)
+            if self.args.use_eval:
+                self.eval(step)
+        path = self.save()
+        self.render(path, save_dir=self.save_dir)
+
+        _remove_bwd_hooks()
+
+        _phase3_diagnostics(model)
+        _phase4_artifacts(self.save_dir)
+
+        _verdict()
         _stop_log()
         env.close()
 
