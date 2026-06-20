@@ -59,7 +59,7 @@ class SB3Policy:
 
     @property
     def config(self) -> dict:
-        return self._model.custom_objects.get("config", {})
+        return getattr(self._model, "_config", None) or {}
 
     def learn(self, steps: int, *, callback: Any = None) -> None:
         self._model.learn(steps, reset_num_timesteps=self._first, callback=callback)
@@ -67,7 +67,7 @@ class SB3Policy:
 
     def save(self, path: str, config: dict | None = None) -> None:
         if config:
-            self._model.custom_objects["config"] = config
+            self._model._config = config
         self._model.save(path)
 
     @property

@@ -38,7 +38,7 @@ class Sb3Trainer:
     def save(self, step: int | None = None) -> str:
         """统一保存入口。step=None → final；否则 checkpoint。
 
-        自动从 env 提取 encoder config 写入模型 custom_objects，返回保存路径。
+        自动从 env 提取 encoder config 写入模型 _config 属性，返回保存路径。
         """
         path = checkpoint_path(self.save_dir, step) if step is not None else final_model_path(self.save_dir)
         enc = self.env.get_attr("obs_encoder")[0]
