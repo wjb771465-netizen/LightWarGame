@@ -35,6 +35,20 @@ class Sb3Trainer:
         self.agent = self.create_agent(self.env, tb_log_dir=self.save_dir)
         self._win_cb = WinRateCallback(window=self.args.win_rate_window)
 
+    def save(self, step: int | None = None) -> str:
+        """统一保存入口。step=None → final；否则 checkpoint。
+
+        自动从 env 提取 encoder config 写入模型 _config 属性，返回保存路径。
+        """
+        path = checkpoint_path(self.save_dir, step) if step is not None else final_model_path(self.save_dir)
+        enc = self.env.get_attr("obs_encoder")[0]
+        self.agent.save(path, config={
+            "max_players": enc._max_players,
+            "use_adjacency": enc._use_adjacency,
+        })
+        label = f"ckpt_{step}" if step is not None else "final"
+        logging.info("模型已保存至 %s/%s.zip", self.save_dir, label)
+        return path
 
     def train(self) -> None:
         self._init_logging()
@@ -46,14 +60,11 @@ class Sb3Trainer:
             self.agent.learn(steps, callback=[self._win_cb])
             self.agent._model._custom_logger = True
             step = self.agent.num_timesteps
-            ckpt = checkpoint_path(self.save_dir, step)
-            self.agent.save(ckpt)
+            self.save(step)
             if self.args.use_eval:
-                self.eval(ckpt, step)
-        final = final_model_path(self.save_dir)
-        self.agent.save(final)
-        logging.info("模型已保存至 %s/final.zip", self.save_dir)
-        self.render(final, save_dir=self.save_dir)
+                self.eval(step)
+        path = self.save()
+        self.render(path, save_dir=self.save_dir)
 
 
     def create_envs(self) -> tuple[VecEnv, VecEnv]:
@@ -133,7 +144,7 @@ class Sb3Trainer:
         return agent
 
 
-    def eval(self, ckpt: str, step: int, region: int | None = None) -> list:
+    def eval(self, step: int, region: int | None = None) -> list:
         """评估 agent vs 对手并记录指标。子类覆写 choose_eval_opponents 以接入 pool。"""
         freq = max(1, self.args.eval_opponent_freq)
         ckpt_idx = step // max(1, self.args.checkpoint_freq)
@@ -152,7 +163,7 @@ class Sb3Trainer:
         for i in range(min(len(specs), self.eval_env.num_envs)):
             self.eval_env.env_method("set_opponent", specs[i], indices=[i])
 
-        results = evaluate(ckpt, self.eval_env, self.args.eval_episodes, specs)
+        results = evaluate(self.agent, self.eval_env, self.args.eval_episodes, specs)
 
         by_type: dict[str, list] = {}
         for r in results:

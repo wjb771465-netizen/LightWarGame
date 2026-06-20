@@ -21,7 +21,7 @@ class RegionPool:
         self._pools: dict[int, OpponentPool] = {}
         self._lock = threading.Lock()
 
-    def add(self, region_id: int, path: str, step: int,
+    def add(self, region_id: int, step: int,
             elo: float | None = None,
             outcomes: list | None = None,
             ) -> tuple[PoolEntry | None, float, bool]:
@@ -41,12 +41,12 @@ class RegionPool:
             if not OpponentPool._should_accept(prev_elo, agent_elo):
                 return None, agent_elo, False
             elo = agent_elo
-            outcomes = None  # 已处理，不往下传
+            outcomes = None
 
         with self._lock:
             if region_id not in self._pools:
                 self._pools[region_id] = OpponentPool(max_size=self._history)
-            return self._pools[region_id].add(path, step, elo=elo)
+            return self._pools[region_id].add(step, elo=elo)
 
     def sample_opponent(
         self,
@@ -103,7 +103,7 @@ class RegionPool:
                 "history": self._history,
                 "regions": {
                     str(rid): [
-                        {"path": e.path, "step": e.step, "elo": e.elo}
+                        {"step": e.step, "elo": e.elo}
                         for e in pool
                     ]
                     for rid, pool in self._pools.items()
@@ -122,5 +122,5 @@ class RegionPool:
         for rid_str, entries in data["regions"].items():
             rid = int(rid_str)
             for entry in entries:
-                pool.add(rid, entry["path"], entry["step"], elo=entry.get("elo"))
+                pool.add(rid, entry["step"], elo=entry.get("elo"))
         return pool

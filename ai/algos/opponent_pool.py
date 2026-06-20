@@ -13,13 +13,12 @@ import numpy as np
 @dataclass
 class PoolEntry:
     """池中一条策略记录。"""
-    path: str                 # checkpoint 文件路径
     step: int                 # 训练步数（同时用于 time 淘汰：step 最小 = 最旧）
-    elo: float | None = None  # ELO 评分，后续 PFSP 阶段填充
+    elo: float | None = None  # ELO 评分
 
 
 class OpponentPool:
-    """管理历史 checkpoint 的索引，支持多种淘汰模式。"""
+    """管理历史 checkpoint 的索引，支持多种淘汰模式。路径由调用方管理。"""
 
     def __init__(self, max_size: int, eviction_mode: str = "time") -> None:
         if eviction_mode not in ("time", "elo"):
@@ -29,14 +28,13 @@ class OpponentPool:
         self._entries: dict[int, PoolEntry] = {}
 
     # ------------------------------------------------------------------
-    def add(self, path: str, step: int, elo: float | None = None,
+    def add(self, step: int, elo: float | None = None,
             outcomes: list | None = None,
             ) -> tuple[PoolEntry | None, float, bool]:
         """注册新 checkpoint；池满时按 eviction_mode 淘汰一个。
 
-        outcomes 为 None → 直接入池（向后兼容，--use-eval 关闭时）。
-        outcomes 非空 → 每个元素应有 .opponent_spec(dict) / .wins / .draws / .episodes，
-                        内部解析对手 step、算分、_update_elo，ELO 不退化 (>=prev) 才入池。
+        outcomes 为 None → 直接入池。
+        outcomes 非空 → 算 ELO + 判断，ELO 不退化 (>=prev) 才入池。
 
         Returns:
             (evicted_entry_or_None, final_elo, accepted)
@@ -57,7 +55,7 @@ class OpponentPool:
         evicted: PoolEntry | None = None
         if len(self._entries) >= self._max_size:
             evicted = self._evict_one()
-        self._entries[step] = PoolEntry(path=path, step=step, elo=elo)
+        self._entries[step] = PoolEntry(step=step, elo=elo)
         return evicted, elo if elo is not None else 1200.0, True
 
     def latest(self) -> PoolEntry | None:
@@ -188,8 +186,8 @@ class OpponentPool:
     def __iter__(self):
         return iter(self._entries.values())
 
-    def __contains__(self, path: str) -> bool:
-        return any(e.path == path for e in self._entries.values())
+    def __contains__(self, step: int) -> bool:
+        return step in self._entries
 
     # ------------------------------------------------------------------
     def _evict_one(self) -> PoolEntry:
