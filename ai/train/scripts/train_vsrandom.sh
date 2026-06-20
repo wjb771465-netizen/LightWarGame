@@ -4,7 +4,7 @@
 set -euo pipefail
 
 SCENARIO="duel/vsbaseline"
-EXP_NAME="vsrandom_mlp256"
+EXP_NAME="vsrandom_mlp512"
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 source "$SCRIPT_DIR/snapshot.sh"
@@ -24,13 +24,13 @@ conda run --no-capture-output -n chinese_war_game \
   --save-dir "$SAVE_DIR" \
   --total-timesteps 5000000 \
   --n-steps 4096 \
-  --batch-size 64 \
+  --batch-size 256 \
   --n-epochs 10 \
-  --lr 3e-4 \
+  --lr 2e-4 \
   --gamma 0.99 \
   --gae-lambda 0.97 \
   --clip-range 0.2 \
-  --net-arch 256 256 \
+  --net-arch 512 512 \
   --checkpoint-freq 100000 \
   --use-eval \
   --eval-episodes 20 \

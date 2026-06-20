@@ -12,18 +12,33 @@
 | `game/runner.py` | 游戏主循环：展示 → 收集指令 → 校验 → 结算 |
 | `game/ui_ports.py` | UI 协议（GameUiPort），Runner 通过它解耦 UI 实现 |
 | `llm/` | LLM 外交官层：diplomat（发言）、director、base、prompts/ |
-| `ai/algos/` | Policy 接口与 SB3Policy 包装（MaskablePPO） |
+| `ai/algos/` | Policy 接口与 SB3Policy 包装（MaskablePPO），opponent/region pool，采样策略，GNN backbone |
 | `ai/envs/` | Gymnasium 环境封装（LwgEnv）、观测/动作编解码、奖励函数、内置对手 |
+| `ai/envs/opponents/` | 内置对手：random、rule、FSM、policy |
+| `ai/envs/rewards/` | 奖励函数：领土、首都、胜负、步数惩罚 |
 | `ai/renders/` | 地图渲染与视频生成（帧 PNG → ffmpeg 合成为视频） |
-| `ai/train/` | 训练脚本、配置（sb3_trainer、args、YAML 配置） |
+| `ai/train/` | 训练入口（`__main__.py`）、配置（args）、训练器（sb3/self_play/region_self_play）、评估（eval）、指标（metrics）、路径工具（utils） |
+| `ai/train/scripts/` | 训练启动脚本（Shell） |
+| `tests/` | 测试（game / ai / llm / integration / smoke），详见下方 Test Conventions |
+| `claude-plans/` | 设计文档与方案讨论 |
 | `main.py` | 终端入口（GameLauncher），处理启动交互与 AI 玩家绑定 |
 | `data/map_configs/` | 地图配置（cn.json：省份、邻接关系、增长率） |
-| `tests/` | 测试（game / ai / llm / integration），详见下方 Test Conventions |
 
 ## Rules
 - AI 玩家配置在 session 目录下的 JSON（通过 `game/campaign/init_game.py` 的 `load_session_config()` 加载），key 为 player_id（从 1 开始），含模型路径、外交官开关、persona 等字段
 - `obs_dim` 从模型权重自动推断 `max_players`，训练后不可更改（改 max_players 需重新训练）
 - 新增运行时依赖必须同步更新 `environment.yml`（conda 依赖放顶层，pip 依赖放 `pip:` 下）
+- Encoder config 通过 `self._model._config` 属性持久化（SB3 无 `custom_objects` API，直接挂属性利用 cloudpickle 序列化）
+
+## Smoke Tests
+
+`tests/smoke/train.py` 覆盖训练全流程：
+
+```
+conda run -n chinese_war_game python -m tests.smoke.train --scenario duel/vsbaseline
+```
+
+4 个 Phase：optimizer check → forward activation check → 全流程训练（save + eval + render）→ gradient/param/product 检查。产出 checkpoint zip、final model zip、tensorboard log、eval video。
 
 ## Test Conventions
 
