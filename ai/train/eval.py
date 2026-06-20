@@ -18,8 +18,6 @@ from dataclasses import dataclass, field
 
 import numpy as np
 
-from ai.algos.policy import SB3Policy
-
 
 @dataclass
 class EvalResult:
@@ -33,7 +31,7 @@ class EvalResult:
 
 
 def evaluate(
-    agent_path: str,
+    agent,
     venv: object,
     episodes_per_env: int,
     opponent_specs: list[dict],
@@ -43,7 +41,7 @@ def evaluate(
     调用方负责在评估前通过 env_method 设置每个 env 的对手和首都。
 
     Args:
-        agent_path: checkpoint 路径（不含 .zip 后缀）
+        agent: SB3Policy 实例
         venv: 已配置对手的 VecEnv
         episodes_per_env: 每个 env 跑的局数
         opponent_specs: 每 env 一个 spec，用于 EvalResult 元数据
@@ -54,8 +52,6 @@ def evaluate(
     n = venv.num_envs
     if n == 0:
         return []
-
-    agent = SB3Policy(path=agent_path)
 
     wins = [0.0] * n
     scores = [0.0] * n

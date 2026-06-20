@@ -54,6 +54,17 @@ class RegionSelfPlayTrainer(SelfPlayTrainer):
             self._win_cbs[R] = WinRateCallback(window=self.args.win_rate_window)
             self._agent_elos[R] = 1200.0
 
+    def save(self, region: int, step: int | None = None) -> str:
+        path = checkpoint_path(self.save_dirs[region], step) if step is not None else final_model_path(self.save_dirs[region])
+        enc = self.envs[region].get_attr("obs_encoder")[0]
+        self.agents[region].save(path, config={
+            "max_players": enc._max_players,
+            "use_adjacency": enc._use_adjacency,
+        })
+        label = f"ckpt_{step}" if step is not None else "final"
+        logging.info("[RegionSP R=%d] 模型已保存至 %s/%s.zip", region, self.save_dirs[region], label)
+        return path
+
     def _opponent_id(self) -> int:
         # 所有 env 共享同一 YAML 配置，agent_id 相同，读一次缓存即可。
         # 这里用第一个 region 的 env 只在 __init__ 阶段的单线程安全窗口内读取。
@@ -82,7 +93,7 @@ class RegionSelfPlayTrainer(SelfPlayTrainer):
                 rid, entry = result
                 specs.append({
                     "type": "policy", "player_id": opponent_id,
-                    "path": entry.path.replace(".zip", ""),
+                    "path": checkpoint_path(self.save_dirs[rid], entry.step),
                     "opp_region": rid,
                 })
             else:
@@ -150,23 +161,21 @@ class RegionSelfPlayTrainer(SelfPlayTrainer):
                 agent._model._custom_logger = True
                 step = agent.num_timesteps
 
-                ckpt = checkpoint_path(self.save_dirs[R], step)
-                agent.save(ckpt)
-
-                ckpt_zip = ckpt + ".zip"
                 if self.args.use_eval:
-                    results = self.eval(ckpt, step, region=R)
+                    results = self.eval(step, region=R)
                     prev_elo = self._agent_elos[R]
                     evicted, self._agent_elos[R], accepted = self.pool.add(
-                        R, ckpt_zip, step, elo=self._agent_elos[R], outcomes=results)
+                        R, step, elo=self._agent_elos[R], outcomes=results)
                     if accepted:
+                        self.save(R, step)
                         logging.info("[RegionSP R=%d] step=%d, ELO %.1f -> %.1f, 入池",
                                      R, step, prev_elo, self._agent_elos[R])
                     else:
                         logging.info("[RegionSP R=%d] step=%d, ELO %.1f -> %.1f, 跳过入池",
                                      R, step, prev_elo, self._agent_elos[R])
                 else:
-                    self.pool.add(R, ckpt_zip, step)
+                    self.save(R, step)
+                    self.pool.add(R, step)
 
                 if self.args.use_eval:
                     self.log_eval_metrics({"elo": self._agent_elos[R]}, step, region=R)
@@ -180,17 +189,12 @@ class RegionSelfPlayTrainer(SelfPlayTrainer):
             self.pool.save(os.path.join(self.save_dir, "pool_state.json"))
 
         for R in self._regions:
-            final = final_model_path(self.save_dirs[R])
-            self.agents[R].save(final)
+            path = self.save(R)
+            opp = random.choice([r for r in self._regions if r != R])
+            self.render(path, save_dir=self.save_dirs[R], agent_capital=R, opponent_capital=opp)
         logging.info("[RegionSelfPlay] 训练完成，模型保存至 %s", self.save_dir)
 
-        for R in self._regions:
-            opp = random.choice([r for r in self._regions if r != R])
-            self.render(final_model_path(self.save_dirs[R]),
-                        save_dir=self.save_dirs[R], agent_capital=R, opponent_capital=opp)
-
-
-    def eval(self, ckpt: str, step: int, region: int | None = None) -> list:
+    def eval(self, step: int, region: int | None = None) -> list:
         R = region
         freq = max(1, self.args.eval_opponent_freq)
         ckpt_idx = step // max(1, self.args.checkpoint_freq)
@@ -215,7 +219,7 @@ class RegionSelfPlayTrainer(SelfPlayTrainer):
                 opp_region = random.choice([r for r in self._regions if r != R])
             eval_env.env_method("set_capitals", R, opp_region, indices=[i])
 
-        results = evaluate(ckpt, eval_env, self.args.eval_episodes, specs)
+        results = evaluate(self.agents[R], eval_env, self.args.eval_episodes, specs)
 
         by_type: dict[str, list] = {}
         for r in results:

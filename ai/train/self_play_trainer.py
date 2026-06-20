@@ -4,7 +4,7 @@ import logging
 
 from ai.algos.opponent_pool import OpponentPool
 from ai.train.sb3_trainer import Sb3Trainer
-from ai.train.utils import checkpoint_path, extract_ckpt_step, final_model_path
+from ai.train.utils import checkpoint_path, extract_ckpt_step
 
 
 class SelfPlayTrainer(Sb3Trainer):
@@ -13,7 +13,6 @@ class SelfPlayTrainer(Sb3Trainer):
         super().__init__(args)
         self._pool = OpponentPool(max_size=self.args.self_play_pool_size)
         self._agent_elo = 1200.0
-
 
     def train(self) -> None:
         self._init_logging()
@@ -40,27 +39,26 @@ class SelfPlayTrainer(Sb3Trainer):
             self.agent.learn(min(chunk, total - self.agent.num_timesteps), callback=[self._win_cb])
             self.agent._model._custom_logger = True
             step = self.agent.num_timesteps
-            ckpt = checkpoint_path(self.save_dir, step)
-            self.agent.save(ckpt)
 
-            ckpt_zip = ckpt + ".zip"
             if self.args.use_eval:
-                results = self.eval(ckpt, step)
+                results = self.eval(step)
                 prev_elo = self._agent_elo
                 evicted, self._agent_elo, accepted = self._pool.add(
-                    ckpt_zip, step, elo=self._agent_elo, outcomes=results)
+                    step, elo=self._agent_elo, outcomes=results)
                 if accepted:
+                    self.save(step)
                     if evicted is not None:
-                        logging.info("[SelfPlay] 池满，淘汰: %s (step=%d)", evicted.path, evicted.step)
+                        logging.info("[SelfPlay] 池满，淘汰: step=%d", evicted.step)
                     logging.info("[SelfPlay] step=%d, ELO %.1f -> %.1f, 入池",
                                  step, prev_elo, self._agent_elo)
                 else:
                     logging.info("[SelfPlay] step=%d, ELO %.1f -> %.1f, 跳过入池",
                                  step, prev_elo, self._agent_elo)
             else:
-                evicted, self._agent_elo, _ = self._pool.add(ckpt_zip, step)
+                self.save(step)
+                evicted, self._agent_elo, _ = self._pool.add(step)
                 if evicted is not None:
-                    logging.info("[SelfPlay] 池满，淘汰: %s (step=%d)", evicted.path, evicted.step)
+                    logging.info("[SelfPlay] 池满，淘汰: step=%d", evicted.step)
 
             self.log_eval_metrics({"elo": self._agent_elo}, step)
 
@@ -79,11 +77,8 @@ class SelfPlayTrainer(Sb3Trainer):
             logging.info("[SelfPlay] step=%d, opponents=[%s], envs=%d, per=%d",
                          step, steps_str, n_envs, per_opponent)
 
-        final = final_model_path(self.save_dir)
-        self.agent.save(final)
-        logging.info("模型已保存至 %s/final.zip", self.save_dir)
-        self.render(final, save_dir=self.save_dir)
-
+        path = self.save()
+        self.render(path, save_dir=self.save_dir)
 
     def _sample_opponent_specs(self, pool, n_total: int, opponent_id: int) -> list[dict]:
         """从 OpponentPool 中有放回采样 n_total 个对手 spec。"""
@@ -106,13 +101,12 @@ class SelfPlayTrainer(Sb3Trainer):
             if entry is not None:
                 specs.append({
                     "type": "policy", "player_id": opponent_id,
-                    "path": entry.path.replace(".zip", ""),
+                    "path": checkpoint_path(self.save_dir, entry.step),
                 })
             else:
                 specs.append({"type": ft, "player_id": opponent_id})
 
         return specs
-
 
     def choose_eval_opponents(self, include_fixed: bool = True, region: int | None = None) -> list[dict]:
         """从 OpponentPool 采样 eval 对手 + 可选固定对手。"""

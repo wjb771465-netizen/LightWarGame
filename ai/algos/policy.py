@@ -57,11 +57,17 @@ class SB3Policy:
     def obs_dim(self) -> int:
         return int(self._model.observation_space.shape[0])
 
+    @property
+    def config(self) -> dict:
+        return self._model.custom_objects.get("config", {})
+
     def learn(self, steps: int, *, callback: Any = None) -> None:
         self._model.learn(steps, reset_num_timesteps=self._first, callback=callback)
         self._first = False
 
-    def save(self, path: str) -> None:
+    def save(self, path: str, config: dict | None = None) -> None:
+        if config:
+            self._model.custom_objects["config"] = config
         self._model.save(path)
 
     @property

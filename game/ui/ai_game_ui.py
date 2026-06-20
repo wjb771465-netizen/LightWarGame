@@ -29,9 +29,11 @@ def setup_ai(ai_cfg: dict[int, Any], game_map) -> tuple[dict[int, Any], dict[int
             from ai.envs.observation import ObservationEncoder
             model_path = str(SESSIONS_DIR.parent / entry["model"])
             policy = SB3Policy(path=model_path)
+            cfg = policy.config
+            use_adj = cfg.get("use_adjacency", True)
+            mp = cfg.get("max_players") or 6
             num_regions = len(game_map.regions) - 1
-            max_players = (policy.obs_dim - 2) // num_regions - 6
-            obs_enc = ObservationEncoder(game_map, max_players)
+            obs_enc = ObservationEncoder(game_map, mp, use_adjacency=use_adj)
             act_enc = ActionEncoder(game_map)
             opponents[pid] = PolicyOpponent(pid, policy, obs_enc, act_enc)
     for opponent in opponents.values():

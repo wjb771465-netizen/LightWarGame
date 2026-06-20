@@ -137,12 +137,13 @@ class TestFixedOpponentSpecs(unittest.TestCase):
         from unittest.mock import patch
         from ai.train.sb3_trainer import Sb3Trainer
         self.args.eval_opponent = eval_opponent
-        # Sb3Trainer.__init__ 会调用 create_env()/create_agent()，
+        # Sb3Trainer.__init__ 会调用 create_envs()/create_agent()，
         # 但 _fixed_opponent_specs 测试不需要它们 → mock 掉
-        with patch.object(Sb3Trainer, "create_env", return_value=None), \
+        with patch.object(Sb3Trainer, "create_envs", return_value=(None, None)), \
              patch.object(Sb3Trainer, "create_agent", return_value=None):
             trainer = Sb3Trainer(self.args)
-            trainer.env = None  # create_env mock 返回了 None
+            trainer.env = None  # create_envs mock 返回了 (None, None)
+            trainer.eval_env = None
             trainer.agent = None
         return trainer
 
