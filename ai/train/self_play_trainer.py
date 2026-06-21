@@ -41,35 +41,29 @@ class SelfPlayTrainer(Sb3Trainer):
             self.agent._model._custom_logger = True
             step = self.agent.num_timesteps
 
-            if self.args.use_eval:
-                results = self.eval(step)
-                if self._warmup:
-                    from ai.train.eval import aggregate_win_rate
-                    wr = aggregate_win_rate([r for r in results if r.opponent_spec.get("type") == self.args.self_play_initial_opponent])
-                    if wr >= self.args.curriculum_win_rate:
-                        self._warmup = False
-                        logging.info("[SelfPlay] 课程学习结束 step=%d wr=%.1f%%，转入自博弈", step, wr * 100)
-                        self.save(step)
-                else:
-                    prev_elo = self._agent_elo
-                    evicted, self._agent_elo, accepted = self._pool.add(
-                        step, elo=self._agent_elo, outcomes=results)
-                    if accepted:
-                        self.save(step)
-                        if evicted is not None:
-                            logging.info("[SelfPlay] 池满，淘汰: step=%d", evicted.step)
+            results = self.eval(step) if self.args.use_eval else None
+
+            if self._warmup:
+                wr = self._win_cb._tracker.win_rate_window
+                if wr is not None and wr >= self.args.curriculum_win_rate:
+                    self._warmup = False
+                    self.save(step)
+                    logging.info("[SelfPlay] 热身结束 step=%d wr=%.1f%%，转入自博弈", step, wr * 100)
+                elif wr is not None:
+                    logging.info("[SelfPlay] 热身 step=%d wr=%.1f%% (阈值 %.1f%%)",
+                                 step, wr * 100, self.args.curriculum_win_rate * 100)
+            else:
+                prev_elo = self._agent_elo
+                evicted, self._agent_elo, accepted = self._pool.add(
+                    step, elo=self._agent_elo, outcomes=results)
+                if accepted:
+                    self.save(step)
+                    if evicted is not None:
+                        logging.info("[SelfPlay] 池满，淘汰: step=%d", evicted.step)
+                    if results is not None:
                         logging.info("[SelfPlay] step=%d, ELO %.1f -> %.1f, 入池",
                                      step, prev_elo, self._agent_elo)
-                    else:
-                        logging.info("[SelfPlay] step=%d, ELO %.1f -> %.1f, 跳过入池",
-                                     step, prev_elo, self._agent_elo)
-            else:
-                self.save(step)
-                evicted, self._agent_elo, _ = self._pool.add(step)
-                if evicted is not None:
-                    logging.info("[SelfPlay] 池满，淘汰: step=%d", evicted.step)
-
-            self.log_eval_metrics({"elo": self._agent_elo}, step)
+                self.log_eval_metrics({"elo": self._agent_elo}, step)
 
             specs = self._sample_opponent_specs(self._pool, n_opponents, opponent_id)
             steps = []
