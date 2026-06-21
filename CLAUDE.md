@@ -70,14 +70,4 @@ conda run -n chinese_war_game python -m tests.smoke.train --scenario duel/vsbase
 
 ## W&B 诊断
 
-用 `/wandb-primary` skill 可查训练 run 的 config、metrics 时序、日志等。该 skill 默认从 `WANDB_ENTITY` / `WANDB_PROJECT` 环境变量拼路径，但本项目不设这些变量，直接用全路径 `wjb771465-beijing-jiaotong-university/duel` 更明确。skill 的 Reports/Launch/Signal/Weave 模块本项目用不上。
-
-本项目关键 metrics 路径：
-
-```
-训练:  region_{R}/MaskablePPO_1/rollout/{ep_rew_mean, win_rate_200, ep_len_mean}
-       region_{R}/MaskablePPO_1/train/{value_loss, entropy_loss, approx_kl, clip_fraction, loss, explained_variance}
-评估:  region_{R}_eval/{elo, vs_*/win_rate}
-```
-
-其中 value_loss、entropy_loss、approx_kl、clip_fraction 四个能反映 PPO 训练健康度：value_loss 是否飞涨、策略熵是否过早塌缩、KL 和 clip 比例是否归零（策略停止更新）。
+参见 `.claude/skills/wandb-inspect/skill.md`。

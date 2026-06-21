@@ -65,7 +65,7 @@ class SelfPlayTrainer(Sb3Trainer):
                                      step, prev_elo, self._agent_elo)
                 self.log_eval_metrics({"elo": self._agent_elo}, step)
 
-            specs = self._sample_opponent_specs(self._pool, n_opponents, opponent_id)
+            specs = self.choose_opponents(n_opponents, opponent_id)
             steps = []
             for i, spec in enumerate(specs):
                 indices = list(range(i * per_opponent, (i + 1) * per_opponent))
@@ -83,24 +83,26 @@ class SelfPlayTrainer(Sb3Trainer):
         path = self.save()
         self.render(path, save_dir=self.save_dir)
 
-    def _sample_opponent_specs(self, pool, n_total: int, opponent_id: int) -> list[dict]:
-        """从 OpponentPool 中有放回采样 n_total 个对手 spec。"""
+    def choose_opponents(self, n_types: int, opponent_id: int) -> list[dict]:
+        """热身或池空 → 冷启动；否则池采样。"""
+        ft = self.args.self_play_initial_opponent
+
+        if self._warmup or len(self._pool) == 0:
+            return [{"type": ft, "player_id": opponent_id}] * n_types
+
         strategy = self.args.pool_sampling_strategy
         lam = self.args.sampling_lam
         scale = self.args.sampling_scale
-        ft = self.args.self_play_initial_opponent
-
         specs = []
-        for _ in range(n_total):
+        for _ in range(n_types):
             if strategy == "uniform":
-                entry = pool.sample_uniform()
+                entry = self._pool.sample_uniform()
             elif strategy == "progress":
-                entry = pool.sample_progress(lam=lam, s=scale, D=self.args.progress_D)
+                entry = self._pool.sample_progress(lam=lam, s=scale, D=self.args.progress_D)
             elif strategy == "elo":
-                entry = pool.sample_elo(lam=lam, s=scale)
-            else:  # latest
-                entry = pool.latest()
-
+                entry = self._pool.sample_elo(lam=lam, s=scale)
+            else:
+                entry = self._pool.latest()
             if entry is not None:
                 specs.append({
                     "type": "policy", "player_id": opponent_id,
@@ -108,31 +110,22 @@ class SelfPlayTrainer(Sb3Trainer):
                 })
             else:
                 specs.append({"type": ft, "player_id": opponent_id})
-
         return specs
 
     def choose_eval_opponents(self, include_fixed: bool = True, region: int | None = None) -> list[dict]:
-        """从 OpponentPool 采样 eval 对手 + 可选固定对手。"""
-        eval_n_envs = self.args.eval_n_envs or self.args.n_envs
-        eval_n_opponents = self.args.eval_n_opponents or self.args.n_opponents or self.args.n_envs
-        opponent_id = self._opponent_id()
+        n_envs = self.args.eval_n_envs or self.args.n_envs
+        n_opps = self.args.eval_n_opponents or self.args.n_opponents or self.args.n_envs
+        oid = self._opponent_id()
 
-        if len(self._pool) == 0:
-            pool_specs = eval_n_envs * [
-                {"type": self.args.self_play_initial_opponent, "player_id": opponent_id},
-            ]
-        else:
-            per_opponent = max(1, eval_n_envs // eval_n_opponents)
-            specs = self._sample_opponent_specs(self._pool, eval_n_opponents, opponent_id)
-            pool_specs = []
-            for spec in specs:
-                pool_specs.extend([spec] * per_opponent)
-            pool_specs = pool_specs[:eval_n_envs]
+        specs = self.choose_opponents(n_opps, oid)
+        per = max(1, n_envs // n_opps)
+        result = []
+        for s in specs:
+            result.extend([s] * per)
+        result = result[:n_envs]
 
-        if not (include_fixed and self.args.eval_opponent):
-            return pool_specs
-
-        half = max(1, eval_n_envs // 2)
-        pool_specs = pool_specs[:half]
-        fixed_specs = self._fixed_opponent_specs(eval_n_envs - half, opponent_id)
-        return pool_specs + fixed_specs
+        if include_fixed and self.args.eval_opponent:
+            half = max(1, n_envs // 2)
+            result = result[:half]
+            result += self._fixed_opponent_specs(n_envs - half, oid)
+        return result

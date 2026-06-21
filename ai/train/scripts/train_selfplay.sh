@@ -24,24 +24,25 @@ conda run --no-capture-output -n chinese_war_game \
   --save-dir "$SAVE_DIR" \
   --self-play \
   --self-play-pool-size 20 \
-  --self-play-initial-opponent random \
+  --self-play-initial-opponent rule \
   --curriculum-win-rate 0.75 \
-  --pool-sampling-strategy uniform \
+  --pool-sampling-strategy progress \
+  --sampling-scale 50 \
   --use-eval \
   --eval-episodes 20 \
   --eval-opponent random,rule,fsm \
   --eval-n-envs 6 \
   --eval-opponent-freq 5 \
-  --total-timesteps 10000000 \
+  --total-timesteps 20000000 \
   --n-steps 2048 \
   --batch-size 512 \
   --n-epochs 10 \
-  --lr 2e-4 \
+  --lr 1.5e-4 \
   --gamma 0.99 \
   --gae-lambda 0.97 \
   --clip-range 0.2 \
   --net-arch 512 512 256 \
-  --checkpoint-freq 50000 \
+  --checkpoint-freq 100000 \
   --win-rate-window 200 \
   --seed 42 \
   --wandb \
