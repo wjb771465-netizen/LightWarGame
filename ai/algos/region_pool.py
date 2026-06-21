@@ -38,8 +38,8 @@ class RegionPool:
                     continue
                 agent_elo, _ = self._update_elo(
                     opp_region, opp_step, agent_elo, OpponentPool._compute_score(r))
-            if not OpponentPool._should_accept(prev_elo, agent_elo):
-                return None, agent_elo, False
+            # if not OpponentPool._should_accept(prev_elo, agent_elo):
+            #     return None, agent_elo, False
             elo = agent_elo
             outcomes = None
 
