@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% block title %}WAIT{% endblock %}
+{% block status %}TURN {{ turn }}{% endblock %}
+{% block content %}
+
+<meta http-equiv="refresh" content="2">
+
+{% if info %}
+<div class="cmd-info">{{ info }}</div>
+{% endif %}
+
+<div class="wait-message">
+  <p>AWAITING OPPONENT ACTION...</p>
+</div>
+
+{% if chat_messages %}
+<div class="chat-panel">
+  <h3>DIPLOMATIC CHANNEL</h3>
+  <div class="chat-messages">
+    {% for msg in chat_messages %}
+    <div class="chat-msg other">
+      <span class="chat-sender">{{ msg.sender_name }}</span>
+      <span class="chat-text">{{ msg.text }}</span>
+      <span class="chat-turn">T{{ "%03d" % msg.turn }}</span>
+    </div>
+    {% endfor %}
+  </div>
+</div>
+{% endif %}
+
+{% endblock %}

@@ -1,0 +1,398 @@
+/* ── Token system ── */
+:root {
+  --bg:          #0e1112;
+  --surface:     #161a1c;
+  --border:      #252a2c;
+  --amber:       #e6a817;
+  --amber-dim:   #2e2610;
+  --tactical:    #3cc75a;
+  --tactical-dim:#142618;
+  --hostile:     #e04a3a;
+  --hostile-dim: #2b1614;
+  --text:        #ccd0d2;
+  --muted:       #6b7275;
+  --radius:      3px;
+}
+
+/* ── Reset ── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Hiragino Sans GB", sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  line-height: 1.55;
+}
+
+/* ── Typography ── */
+h1, h2, h3 {
+  font-family: "SF Mono", "Cascadia Code", "JetBrains Mono", "Menlo", monospace;
+  font-weight: 500;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+h1 { font-size: 1.2rem; color: var(--amber); }
+h2 { font-size: 1rem; margin-bottom: 0.75rem; }
+h3 { font-size: 0.85rem; margin: 1rem 0 0.5rem; color: var(--muted); }
+
+a { color: var(--amber); text-decoration: none; }
+a:hover { text-decoration: underline; }
+
+/* ── Layout ── */
+.container { max-width: 880px; margin: 0 auto; padding: 1.2rem 1rem 3rem; }
+
+header {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  border-bottom: 1px solid var(--border);
+  padding-bottom: 0.6rem;
+  margin-bottom: 1.2rem;
+}
+header h1 { font-size: 1.1rem; }
+header .status-line { font-size: 0.78rem; color: var(--muted); font-family: "SF Mono", monospace; }
+
+footer {
+  margin-top: 2rem;
+  padding-top: 0.6rem;
+  border-top: 1px solid var(--border);
+  color: var(--muted);
+  font-size: 0.75rem;
+}
+
+/* ── Forms ── */
+fieldset {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 1rem 1.2rem;
+  margin-bottom: 1rem;
+}
+legend {
+  font-family: "SF Mono", monospace;
+  color: var(--amber);
+  padding: 0 0.4rem;
+  font-size: 0.85rem;
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+}
+label {
+  display: inline-block;
+  margin-right: 1rem;
+  margin-bottom: 0.5rem;
+  font-size: 0.88rem;
+  color: var(--muted);
+}
+input, select {
+  background: var(--bg);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 0.35rem 0.5rem;
+  font-size: 0.88rem;
+  font-family: inherit;
+}
+input:focus, select:focus {
+  outline: none;
+  border-color: var(--amber);
+  box-shadow: 0 0 0 2px var(--amber-dim);
+}
+input[type="number"] {
+  width: 5rem;
+  font-variant-numeric: tabular-nums;
+  font-family: "SF Mono", monospace;
+}
+
+button, .btn {
+  background: var(--amber);
+  color: var(--bg);
+  border: none;
+  border-radius: var(--radius);
+  padding: 0.4rem 1rem;
+  font-size: 0.85rem;
+  font-family: "SF Mono", monospace;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  cursor: pointer;
+}
+button:hover { background: #f0b830; }
+button.secondary {
+  background: transparent;
+  color: var(--amber);
+  border: 1px solid var(--amber);
+}
+button.secondary:hover { background: var(--amber-dim); }
+button.danger {
+  background: transparent;
+  color: var(--hostile);
+  border: 1px solid var(--hostile);
+}
+button.danger:hover { background: var(--hostile-dim); }
+
+hr {
+  border: none;
+  border-top: 1px solid var(--border);
+  margin: 1.5rem 0;
+}
+
+/* ── Observation table ── */
+table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 0.75rem 0 1.5rem;
+  font-size: 0.84rem;
+}
+thead { border-bottom: 2px solid var(--border); }
+th {
+  text-align: left;
+  padding: 0.4rem 0.5rem;
+  color: var(--muted);
+  font-family: "SF Mono", monospace;
+  font-weight: 500;
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+td {
+  padding: 0.35rem 0.5rem;
+  border-bottom: 1px solid rgba(37, 42, 44, 0.5);
+  font-variant-numeric: tabular-nums;
+}
+
+tr.owned { border-left: 3px solid var(--tactical); }
+tr.owned td:first-child { padding-left: 0.25rem; }
+tr.owned td:nth-child(4) { color: var(--tactical); }   /* 己方兵力绿色 */
+
+tr.enemy { border-left: 3px solid var(--hostile); }
+tr.enemy td:first-child { padding-left: 0.25rem; }
+
+/* ── Command form ── */
+.command-panel {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 0.8rem 1rem;
+  margin-bottom: 0.75rem;
+}
+.command-form {
+  display: flex;
+  gap: 0.6rem;
+  align-items: flex-end;
+  flex-wrap: wrap;
+}
+.command-form label {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  font-size: 0.75rem;
+  font-family: "SF Mono", monospace;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+/* ── Pending commands ── */
+.pending-list {
+  list-style: none;
+  margin-bottom: 0.6rem;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+}
+.pending-list li {
+  background: var(--amber-dim);
+  border: 1px solid rgba(230, 168, 23, 0.2);
+  border-radius: var(--radius);
+  padding: 0.15rem 0.5rem;
+  font-size: 0.8rem;
+  font-family: "SF Mono", monospace;
+  color: var(--amber);
+}
+.pending-count {
+  font-family: "SF Mono", monospace;
+  font-size: 0.75rem;
+  color: var(--muted);
+  margin-bottom: 0.5rem;
+}
+
+/* ── Battle report ── */
+.battle-item {
+  padding: 0.35rem 0.6rem;
+  margin: 0.2rem 0;
+  border-left: 3px solid var(--amber);
+  background: var(--amber-dim);
+  border-radius: 0 var(--radius) var(--radius) 0;
+  font-size: 0.88rem;
+}
+
+/* ── Status states ── */
+.wait-message {
+  text-align: center;
+  padding: 3rem 1rem;
+}
+.wait-message p { color: var(--muted); }
+
+.winner {
+  font-family: "SF Mono", monospace;
+  font-size: 1.3rem;
+  color: var(--amber);
+  text-transform: uppercase;
+  letter-spacing: 0.1em;
+}
+
+/* ── Turn badge ── */
+.turn-badge {
+  display: inline-block;
+  background: var(--surface);
+  border: 1px solid var(--amber);
+  border-radius: var(--radius);
+  padding: 0.1rem 0.6rem;
+  font-family: "SF Mono", monospace;
+  font-size: 0.78rem;
+  color: var(--amber);
+  letter-spacing: 0.06em;
+}
+
+.cmd-error {
+  background: var(--hostile-dim);
+  border: 1px solid var(--hostile);
+  border-radius: var(--radius);
+  padding: 0.5rem 0.8rem;
+  margin-bottom: 0.75rem;
+  color: var(--hostile);
+  font-family: "SF Mono", monospace;
+  font-size: 0.82rem;
+}
+
+.cmd-info {
+  background: var(--amber-dim);
+  border: 1px solid var(--amber);
+  border-radius: var(--radius);
+  padding: 0.5rem 0.8rem;
+  margin-bottom: 0.75rem;
+  color: var(--amber);
+  font-family: "SF Mono", monospace;
+  font-size: 0.82rem;
+}
+
+.quota {
+  color: var(--amber);
+  font-size: 0.75rem;
+  margin-left: 0.25rem;
+}
+
+/* ── Map ── */
+.map-container {
+  text-align: center;
+  margin-bottom: 1.5rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  padding: 0.4rem;
+}
+.map-container img {
+  max-width: 100%;
+  height: auto;
+  display: block;
+  border-radius: calc(var(--radius) - 1px);
+}
+
+/* ── Chat / Diplomacy panel ── */
+.chat-panel {
+  margin-top: 1.5rem;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+}
+.chat-panel h3 {
+  margin: 0;
+  padding: 0.5rem 1rem;
+  border-bottom: 1px solid var(--border);
+  font-size: 0.75rem;
+  color: var(--amber);
+  font-family: "SF Mono", monospace;
+  letter-spacing: 0.1em;
+}
+
+.chat-messages {
+  max-height: 16rem;
+  overflow-y: auto;
+  padding: 0.6rem 0.8rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.4rem;
+}
+
+.chat-msg {
+  max-width: 80%;
+  padding: 0.35rem 0.6rem;
+  border-radius: var(--radius);
+  font-size: 0.82rem;
+  line-height: 1.4;
+}
+.chat-msg.self {
+  align-self: flex-end;
+  background: var(--amber-dim);
+  border: 1px solid rgba(230, 168, 23, 0.2);
+}
+.chat-msg.other {
+  align-self: flex-start;
+  background: var(--bg);
+  border: 1px solid var(--border);
+}
+
+.chat-sender {
+  display: block;
+  font-family: "SF Mono", monospace;
+  font-size: 0.68rem;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  margin-bottom: 0.15rem;
+}
+.chat-msg.self .chat-sender { color: var(--amber); }
+
+.chat-text {
+  display: block;
+  color: var(--text);
+}
+
+.chat-turn {
+  display: block;
+  font-family: "SF Mono", monospace;
+  font-size: 0.62rem;
+  color: var(--muted);
+  margin-top: 0.2rem;
+  text-align: right;
+}
+
+.chat-empty {
+  color: var(--muted);
+  font-size: 0.8rem;
+  text-align: center;
+  padding: 0.5rem 0;
+}
+
+.chat-form {
+  display: flex;
+  gap: 0.4rem;
+  padding: 0.5rem 0.8rem;
+  border-top: 1px solid var(--border);
+}
+.chat-form input {
+  flex: 1;
+  background: var(--bg);
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 0.4rem 0.6rem;
+  font-size: 0.85rem;
+  font-family: inherit;
+}
+.chat-form input:focus {
+  outline: none;
+  border-color: var(--amber);
+}
+.chat-form button {
+  font-size: 0.75rem;
+  padding: 0.35rem 0.8rem;
+}

@@ -1,11 +1,12 @@
 from __future__ import annotations
 
 import os
+import time
 from pathlib import Path
 from typing import Any
 
 import yaml
-from openai import OpenAI
+from openai import APIStatusError, OpenAI
 
 from game.campaign.chat import ChatRoom
 from game.datatypes.state import GameState

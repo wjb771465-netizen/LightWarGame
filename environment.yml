@@ -8,6 +8,7 @@ dependencies:             # 需要安装的包列表
   - numpy
   - matplotlib
   - pyyaml
+  - flask>=3.0
   - gymnasium
   - ffmpeg
   - pip:

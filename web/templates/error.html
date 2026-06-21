@@ -1,0 +1,11 @@
+{% extends "base.html" %}
+{% block title %}ERROR{% endblock %}
+{% block content %}
+
+<h2>RUNNER CRASHED</h2>
+<div style="background: var(--hostile-dim); border: 1px solid var(--hostile); border-radius: var(--radius); padding: 1rem; margin: 1rem 0; overflow-x: auto;">
+  <pre style="font-family: 'SF Mono', monospace; font-size: 0.8rem; color: var(--hostile); white-space: pre-wrap;">{{ error }}</pre>
+</div>
+<a href="{{ url_for('index') }}"><button>RETURN TO BASE</button></a>
+
+{% endblock %}

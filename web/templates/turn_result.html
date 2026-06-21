@@ -1,0 +1,31 @@
+{% extends "base.html" %}
+{% block title %}RPT T{{ "%03d" % turn }}{% endblock %}
+{% block status %}TURN {{ turn }}{% endblock %}
+{% block content %}
+
+{% if game_over %}
+  <h2>MISSION COMPLETE</h2>
+  {% if winner %}
+  <p class="winner">VICTORY · PLAYER {{ winner }}</p>
+  {% else %}
+  <p class="winner">DRAW</p>
+  {% endif %}
+  <br>
+  <a href="{{ url_for('index') }}">RETURN TO BASE</a>
+
+{% else %}
+  <h2>TURN {{ turn }} · SITREP</h2>
+  {% if changes %}
+  <ul>
+    {% for change in changes %}
+    <li class="battle-item">{{ change }}</li>
+    {% endfor %}
+  </ul>
+  {% else %}
+  <p style="color: var(--muted);">NO TERRITORY CHANGES THIS TURN.</p>
+  {% endif %}
+  <br>
+  <a href="{{ url_for('play') }}"><button>NEXT TURN</button></a>
+{% endif %}
+
+{% endblock %}

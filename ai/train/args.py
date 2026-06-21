@@ -242,6 +242,8 @@ def _get_self_play_config(parser: argparse.ArgumentParser) -> argparse.ArgumentP
                        help="Logistic-Softmax 缩放因子 s（default: 100.0）")
     group.add_argument("--progress-D", type=float, default=None,
                        help="progress 策略的 logistic 尺度 D，不传则自动计算")
+    group.add_argument("--curriculum-win-rate", type=float, default=0.0,
+                       help="课程学习胜率阈值，达标后结束 warmup 进入自博弈（0=不启用，default: 0）")
     return parser
 
 

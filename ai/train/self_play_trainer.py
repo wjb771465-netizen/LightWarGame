@@ -13,6 +13,7 @@ class SelfPlayTrainer(Sb3Trainer):
         super().__init__(args)
         self._pool = OpponentPool(max_size=self.args.self_play_pool_size)
         self._agent_elo = 1200.0
+        self._warmup = True
 
     def train(self) -> None:
         self._init_logging()
@@ -42,18 +43,26 @@ class SelfPlayTrainer(Sb3Trainer):
 
             if self.args.use_eval:
                 results = self.eval(step)
-                prev_elo = self._agent_elo
-                evicted, self._agent_elo, accepted = self._pool.add(
-                    step, elo=self._agent_elo, outcomes=results)
-                if accepted:
-                    self.save(step)
-                    if evicted is not None:
-                        logging.info("[SelfPlay] 池满，淘汰: step=%d", evicted.step)
-                    logging.info("[SelfPlay] step=%d, ELO %.1f -> %.1f, 入池",
-                                 step, prev_elo, self._agent_elo)
+                if self._warmup:
+                    from ai.train.eval import aggregate_win_rate
+                    wr = aggregate_win_rate([r for r in results if r.opponent_spec.get("type") == self.args.self_play_initial_opponent])
+                    if wr >= self.args.curriculum_win_rate:
+                        self._warmup = False
+                        logging.info("[SelfPlay] 课程学习结束 step=%d wr=%.1f%%，转入自博弈", step, wr * 100)
+                        self.save(step)
                 else:
-                    logging.info("[SelfPlay] step=%d, ELO %.1f -> %.1f, 跳过入池",
-                                 step, prev_elo, self._agent_elo)
+                    prev_elo = self._agent_elo
+                    evicted, self._agent_elo, accepted = self._pool.add(
+                        step, elo=self._agent_elo, outcomes=results)
+                    if accepted:
+                        self.save(step)
+                        if evicted is not None:
+                            logging.info("[SelfPlay] 池满，淘汰: step=%d", evicted.step)
+                        logging.info("[SelfPlay] step=%d, ELO %.1f -> %.1f, 入池",
+                                     step, prev_elo, self._agent_elo)
+                    else:
+                        logging.info("[SelfPlay] step=%d, ELO %.1f -> %.1f, 跳过入池",
+                                     step, prev_elo, self._agent_elo)
             else:
                 self.save(step)
                 evicted, self._agent_elo, _ = self._pool.add(step)

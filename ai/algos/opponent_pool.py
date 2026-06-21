@@ -130,7 +130,7 @@ class OpponentPool:
     @staticmethod
     def _should_accept(prev_elo: float, new_elo: float) -> bool:
         """ELO 不退化则接受入池。子类可覆写以替换门控策略。"""
-        return new_elo >= prev_elo - 100.0
+        return new_elo >= prev_elo
 
     @staticmethod
     def _compute_score(r) -> float:

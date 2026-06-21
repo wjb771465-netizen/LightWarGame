@@ -1,0 +1,84 @@
+{% extends "base.html" %}
+{% block title %}T{{ "%03d" % turn }}{% endblock %}
+{% block status %}TURN {{ turn }} · PLAYER {{ player_id }}{% endblock %}
+{% block content %}
+
+<h2>TURN {{ turn }} <span style="color: var(--muted); font-size: 0.7rem;">— PLAYER {{ player_id }} OBSERVATION</span></h2>
+
+{% if map_path %}
+<div class="map-container">
+  <img src="{{ url_for('map_image', session_name=session_name) }}" alt="Turn {{ turn }} Map">
+</div>
+{% endif %}
+
+<table>
+  <thead>
+    <tr>
+      <th>ID</th><th>REGION</th><th>OWNER</th><th>TROOPS</th><th>GROWTH</th><th>CAPITAL</th>
+    </tr>
+  </thead>
+  <tbody>
+  {% for r in obs.regions %}
+  <tr class="{% if r.owner == obs.viewer_id %}owned{% else %}enemy{% endif %}">
+    <td>{{ r.id }}</td>
+    <td>{{ r.name }}</td>
+    <td>{% if r.owner == obs.viewer_id %}OWN{% else %}P{{ r.owner }}{% endif %}</td>
+    <td>
+      {% if r.troops is not none %}{{ r.troops }}{% else %}—{% endif %}
+      {% if r.id in quotas and quotas[r.id] > 0 %}<span class="quota">({{ quotas[r.id] }})</span>{% endif %}
+    </td>
+    <td>{% if r.base_growth is not none %}+{{ r.base_growth }}{% else %}—{% endif %}</td>
+    <td>{% if r.is_capital %}●{% endif %}</td>
+  </tr>
+  {% endfor %}
+  </tbody>
+</table>
+
+<p class="pending-count">COMMANDS ({{ pending|length }}/{{ cmd_limit }})</p>
+{% if pending %}
+<ul class="pending-list">
+  {% for cmd in pending %}
+  <li>{{ cmd.source_name }} &#x27A1; {{ cmd.target_name }} · {{ cmd.troops }}</li>
+  {% endfor %}
+</ul>
+{% endif %}
+
+{% if error %}
+<div class="cmd-error">{{ error }}</div>
+{% endif %}
+
+<div class="command-panel">
+  <form class="command-form" method="POST" action="{{ url_for('command') }}">
+    <label>SRC <input name="source" type="number" min="1" max="31" required></label>
+    <label>TGT <input name="target" type="number" min="1" max="31" required></label>
+    <label>TROOPS <input name="troops" type="number" min="1" required></label>
+    <button type="submit">ADD</button>
+  </form>
+</div>
+
+<form method="POST" action="{{ url_for('command') }}">
+  <button type="submit" name="done" value="1" class="danger">COMMIT ALL · END TURN</button>
+</form>
+
+<div class="chat-panel">
+  <h3>DIPLOMATIC CHANNEL</h3>
+  <div class="chat-messages">
+    {% if chat_messages %}
+      {% for msg in chat_messages %}
+      <div class="chat-msg {% if msg.sender_id == player_id %}self{% else %}other{% endif %}">
+        <span class="chat-sender">{{ msg.sender_name }}</span>
+        <span class="chat-text">{{ msg.text }}</span>
+        <span class="chat-turn">T{{ "%03d" % msg.turn }}</span>
+      </div>
+      {% endfor %}
+    {% else %}
+      <p class="chat-empty">— 外交频道静默 —</p>
+    {% endif %}
+  </div>
+  <form class="chat-form" method="POST" action="{{ url_for('chat') }}">
+    <input name="text" type="text" placeholder="外交发言..." maxlength="200" required>
+    <button type="submit">SEND</button>
+  </form>
+</div>
+
+{% endblock %}

@@ -19,7 +19,7 @@ observation:
   max_troops: 500
   max_growth: 10
   cmd_max: 16
-  use_adjacency: true       # 全地图邻接矩阵进观测（N*N bit，N=31）
+  use_adjacency: true       # 邻接信息进观测（is_adj_to_my_territory，1 bit/region）
 
 action:
   troop_buckets: [0.25, 0.5, 0.75, 1.0]
