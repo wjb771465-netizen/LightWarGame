@@ -24,8 +24,8 @@ conda run --no-capture-output -n chinese_war_game \
   --save-dir "$SAVE_DIR" \
   --self-play \
   --self-play-pool-size 20 \
-  --self-play-initial-opponent rule \
-  --curriculum-win-rate 0.6 \
+  --self-play-initial-opponent random \
+  --curriculum-win-rate 0.75 \
   --pool-sampling-strategy uniform \
   --use-eval \
   --eval-episodes 20 \
