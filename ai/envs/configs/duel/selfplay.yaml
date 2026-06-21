@@ -3,8 +3,7 @@ game:
   num_players: 2
   max_players: 6
   max_turns: 150
-  capital_mode: fixed
-  capitals: [4, 20]        #河北(4) vs 江西(20)
+  capital_mode: random
 
 reward:
   win: 100.0
