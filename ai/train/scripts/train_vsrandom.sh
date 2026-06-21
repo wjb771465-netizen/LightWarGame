@@ -26,7 +26,7 @@ conda run --no-capture-output -n chinese_war_game \
   --n-steps 2048 \
   --batch-size 512 \
   --n-epochs 10 \
-  --lr 1e-4 \
+  --lr 2e-4 \
   --gamma 0.99 \
   --gae-lambda 0.97 \
   --clip-range 0.2 \
@@ -34,6 +34,8 @@ conda run --no-capture-output -n chinese_war_game \
   --checkpoint-freq 50000 \
   --use-eval \
   --eval-episodes 20 \
+  --pool-sampling-strategy progress \
+  --sampling-scale 50 \
   --seed 42 \
   --wandb \
   "$@"
