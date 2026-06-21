@@ -32,15 +32,15 @@ conda run --no-capture-output -n chinese_war_game \
   --eval-opponent          random,rule,fsm \
   --eval-n-envs             6 \
   --eval-opponent-freq     20 \
-  --total-timesteps        5000000 \
+  --total-timesteps        10000000 \
   --n-steps                2048 \
-  --batch-size             512 \
+  --batch-size             256 \
   --n-epochs               10 \
-  --lr                     3e-4 \
+  --lr                     2e-4 \
   --gamma                  0.99 \
   --gae-lambda             0.97 \
   --clip-range             0.2 \
-  --net-arch               256 256 \
+  --net-arch               512 512 \
   --checkpoint-freq        16384 \
   --win-rate-window        200 \
   --seed                   42 \
