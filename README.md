@@ -7,8 +7,20 @@
 ```bash
 conda env create -f environment.yml
 conda activate chinese_war_game
+
+# 终端对战
 python main.py
+
+# Web 界面（浏览器自动打开）
+python -m web
 ```
+
+![Web 对局界面](docs/images/game_map.png)
+
+> **AI 外交官**需要 LLM API Key。推荐[硅基流动](https://cloud.siliconflow.cn/i/Mgp8zD08)——注册即有免费额度：
+> ```bash
+> export SILICONFLOW_API_KEY=sk-xxxxxxxxxxxxxxxxxxxxxxxx
+> ```
 
 ## 对战 Vivian
 
@@ -16,14 +28,7 @@ python main.py
 
 对手是 **Vivian**——海外名校国际关系研究生，游戏高手，习惯叫你弟弟。她由强化学习模型驱动，每回合自动行动；如果你配置了 LLM API Key，她还会在每回合开始时发表外交言论，你可以输入回应。
 
-### 开启 Vivian 的外交功能
-
-推荐使用[硅基流动](https://cloud.siliconflow.cn/i/Mgp8zD08)——注册即有免费额度，支持 DeepSeek-V3：
-
-```bash
-export SILICONFLOW_API_KEY=your_key_here
-python main.py
-```
+![外交频道](docs/images/chat.png)
 
 ## 基本玩法
 

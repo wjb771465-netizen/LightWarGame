@@ -5,6 +5,7 @@ from __future__ import annotations
 import sys
 from typing import Optional, TextIO
 
+from game.constants import max_commands
 from game.datatypes.game_obs import Observation
 from game.datatypes.state import GameState
 
@@ -36,6 +37,12 @@ def show_game_start(
 def show_turn_start(state: GameState, out: Optional[TextIO] = None) -> None:
     o = out or sys.stdout
     print(f"\n----- 第 {state.turn} 回合 -----\n", file=o)
+    # 各玩家指令配额
+    parts: list[str] = []
+    for pid in state.active_players:
+        owned = sum(1 for r in state.game_map.regions[1:] if r is not None and r.owner == pid)
+        parts.append(f"P{pid}: {max_commands(owned)} 指令 ({owned} 领地)")
+    print("指令配额:", "  ".join(parts), file=o)
 
 
 def show_full_state(state: GameState, out: Optional[TextIO] = None) -> None:

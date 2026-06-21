@@ -1,0 +1,58 @@
+{% extends "base.html" %}
+{% block title %}BASE{% endblock %}
+{% block content %}
+
+{% if in_game %}
+<div class="cmd-info" style="margin-bottom: 1.5rem;">
+  A game is in progress.
+  <a href="{{ url_for('play') }}" style="margin-left: 0.5rem;"><button>REJOIN</button></a>
+</div>
+{% endif %}
+
+<h2>CREATE TEMPLATE</h2>
+<form method="POST" action="{{ url_for('create_session') }}">
+  <fieldset>
+    <legend>New Session Config</legend>
+    <label>Name <input name="session_name" placeholder="e.g. duel_north" required></label>
+    <label>Players <input name="num_players" type="number" value="2" min="2" max="4"></label>
+    <label>Capitals <input name="capitals" placeholder="random if empty; e.g. 20,4"></label>
+    <button type="submit">SAVE TEMPLATE</button>
+  </fieldset>
+</form>
+
+{% if sessions %}
+<hr>
+<h2>START GAME</h2>
+<table>
+  <thead>
+    <tr><th>SESSION</th><th>P</th><th>AI</th><th>SAVE</th><th></th></tr>
+  </thead>
+  <tbody>
+  {% for s in sessions %}
+  <tr>
+    <td>{{ s.name }}</td>
+    <td>{{ s.num_players }}</td>
+    <td>{% if s.has_ai %}●{% else %}—{% endif %}</td>
+    <td>{% if s.has_save %}TURN {{ s.turn }}{% else %}—{% endif %}</td>
+    <td>
+      <form method="POST" action="{{ url_for('start') }}" style="display:inline">
+        <input type="hidden" name="session" value="{{ s.name }}">
+        <input type="hidden" name="force_new" value="1">
+        <button type="submit" class="secondary">NEW</button>
+      </form>
+      {% if s.has_save %}
+      <form method="POST" action="{{ url_for('start') }}" style="display:inline">
+        <input type="hidden" name="session" value="{{ s.name }}">
+        <button type="submit">CONTINUE</button>
+      </form>
+      {% endif %}
+    </td>
+  </tr>
+  {% endfor %}
+  </tbody>
+</table>
+{% else %}
+<p style="color: var(--muted); margin-top: 1rem;">No session templates yet. Create one above.</p>
+{% endif %}
+
+{% endblock %}
