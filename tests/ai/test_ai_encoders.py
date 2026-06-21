@@ -7,6 +7,8 @@ ai/envs/observation.py 和 ai/envs/action.py 的单元测试。
 import math
 import unittest
 
+import numpy as np
+
 from game.datatypes.game_map import Region
 from game.datatypes.game_obs import build_observation
 from tests.helpers import map_with_regions
@@ -88,12 +90,13 @@ class TestObservationEncoder(unittest.TestCase):
         self.assertAlmostEqual(self.vec[base + troops_offset], 0.0)
 
     def test_no_adjacency_feature_in_baseline(self):
-        # baseline 模式：每个 region F = max_players+5，末尾无 is_adj_to_my_territory
+        # baseline 模式：每个 region F = max_players+5，末尾无邻接矩阵
         self.assertEqual(self.enc._F, 2 + 5)
+        self.assertEqual(self.enc.dim, 3 * 7 + 2)
 
 
 class TestObservationEncoderWithAdj(unittest.TestCase):
-    """use_adjacency=True：追加 is_adj_to_my_territory（1 bit/region）。"""
+    """use_adjacency=True：追加整张地图邻接矩阵（N*N bit，放在 region 特征与全局特征之间）。"""
 
     def setUp(self):
         self.gm = _make_map()
@@ -102,23 +105,33 @@ class TestObservationEncoderWithAdj(unittest.TestCase):
         self.vec = self.enc.encode(self.obs)
 
     def test_dim_matches_formula(self):
-        # F = max_players + 6, G = 2
-        expected = 3 * (2 + 6) + 2
+        # F = max_players + 5, plus N*N adjacency, G = 2
+        expected = 3 * (2 + 5) + 3 * 3 + 2
         self.assertEqual(self.enc.dim, expected)
 
-    def test_adj_to_my_territory_set_for_enemy_neighbor(self):
-        # region2 与 region1（己方）相邻 → is_adj_to_my_territory=1
+    def test_adjacency_matrix_between_regions_and_global(self):
         F = self.enc._F
-        base = 1 * F
-        adj_offset = (2 + 1) + 4
-        self.assertAlmostEqual(self.vec[base + adj_offset], 1.0)
+        region_end = 3 * F
+        adj_start = region_end
+        adj_end = adj_start + 9
+        # 全局特征仍占据最后两维（encode 默认 commands_total=1, commands_used=0）
+        self.assertAlmostEqual(self.vec[-2], 1.0 / 16.0)
+        self.assertAlmostEqual(self.vec[-1], 0.0)
+        # 邻接矩阵块在 region 和 global 之间
+        adj_block = self.vec[adj_start:adj_end]
+        expected = self.gm.adjacency_matrix.flatten()
+        np.testing.assert_array_equal(adj_block, expected)
 
-    def test_adj_to_my_territory_zero_for_nonadjacent(self):
-        # region3 不与 region1 相邻 → is_adj_to_my_territory=0
+    def test_adjacency_matrix_values(self):
         F = self.enc._F
-        base = 2 * F
-        adj_offset = (2 + 1) + 4
-        self.assertAlmostEqual(self.vec[base + adj_offset], 0.0)
+        adj_start = 3 * F
+        adj = self.vec[adj_start:adj_start + 9].reshape(3, 3)
+        expected = np.array([
+            [0, 1, 0],
+            [1, 0, 1],
+            [0, 1, 0],
+        ], dtype=np.float32)
+        np.testing.assert_array_equal(adj, expected)
 
 
 class TestAdjacencyMatrix(unittest.TestCase):
@@ -137,7 +150,6 @@ class TestAdjacencyMatrix(unittest.TestCase):
 
     def test_symmetric(self):
         mat = self.gm.adjacency_matrix
-        np = __import__("numpy")
         self.assertTrue(np.allclose(mat, mat.T))
 
     def test_correct_edges(self):

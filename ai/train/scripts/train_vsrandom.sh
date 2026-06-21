@@ -1,10 +1,10 @@
 #!/usr/bin/env bash
-# 对战随机对手训练
-# 用法：bash ai/train/train_vsrandom.sh [额外参数]
+# 对战随机对手训练（随机首都 + 全邻接矩阵）
+# 用法：bash ai/train/scripts/train_vsrandom.sh [额外参数]
 set -euo pipefail
 
-SCENARIO="duel/vsbaseline"
-EXP_NAME="vsrandom_mlp256"
+SCENARIO="duel/vsbaseline_randcap"
+EXP_NAME="vsrandom_mlp512_randcap"
 
 SCRIPT_DIR="$(cd "$(dirname "$0")" && pwd)"
 source "$SCRIPT_DIR/snapshot.sh"
@@ -22,18 +22,20 @@ conda run --no-capture-output -n chinese_war_game \
   --scenario "$SCENARIO" \
   --exp-name "$EXP_NAME" \
   --save-dir "$SAVE_DIR" \
-  --total-timesteps 5000000 \
-  --n-steps 4096 \
-  --batch-size 64 \
+  --total-timesteps 10000000 \
+  --n-steps 2048 \
+  --batch-size 512 \
   --n-epochs 10 \
-  --lr 3e-4 \
+  --lr 2e-4 \
   --gamma 0.99 \
   --gae-lambda 0.97 \
   --clip-range 0.2 \
-  --net-arch 256 256 \
-  --checkpoint-freq 100000 \
+  --net-arch 512 512 256 \
+  --checkpoint-freq 50000 \
   --use-eval \
   --eval-episodes 20 \
+  --pool-sampling-strategy progress \
+  --sampling-scale 50 \
   --seed 42 \
   --wandb \
   "$@"
