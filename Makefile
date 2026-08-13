@@ -1,7 +1,7 @@
 .PHONY: test test-all test-ai test-game test-integration
 
 test:
-	env RUN_INTEGRATION= SILICONFLOW_API_KEY= \
+	env RUN_INTEGRATION= OPENAI_API_KEY= \
 		conda run -n chinese_war_game python -m unittest discover -s tests -t . -p "test_*.py" -v
 
 test-all:

@@ -43,7 +43,7 @@ conda run -n chinese_war_game python -m tests.smoke.train --scenario duel/vsbase
 ## Test Conventions
 
 - **Framework**: `unittest`，通过项目根目录的 `Makefile` 运行：
-  - `make test` — 全量（跳过集成测试，需要 `RUN_INTEGRATION` 或 `SILICONFLOW_API_KEY` 环境变量）
+  - `make test` — 全量（跳过集成测试，需要 `RUN_INTEGRATION` 或 `OPENAI_API_KEY` 环境变量）
   - `make test-ai` — 仅 `tests/ai/`
   - `make test-game` — 仅 `tests/game/`
   - `make test-integration` — 仅 `tests/integration/`

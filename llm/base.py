@@ -1,41 +1,50 @@
 from __future__ import annotations
 
 import os
-import time
-from pathlib import Path
-from typing import Any
 
-import yaml
-from openai import APIStatusError, OpenAI
+from dotenv import load_dotenv
+from openai import OpenAI
 
 from game.campaign.chat import ChatRoom
 from game.datatypes.state import GameState
 
-_CONFIG_PATH = Path(__file__).parent / "config.yaml"
+load_dotenv()
+
+_DEFAULT_BASE_URL = "https://api.siliconflow.cn/v1"
+_DEFAULT_MODEL = "Qwen/Qwen3-8B"
+_DEFAULT_TEMPERATURE = 0.7
+_DEFAULT_MAX_TOKENS = 128
 
 
-def _load_config() -> dict[str, Any]:
-    return yaml.safe_load(_CONFIG_PATH.read_text(encoding="utf-8"))
+def _env_bool(name: str, default: bool) -> bool:
+    raw = os.getenv(name)
+    if raw is None or raw == "":
+        return default
+    return raw.strip().lower() in ("1", "true", "yes", "on")
 
 
 class BaseLLMAgent:
     def __init__(self, system_prompt: str, model: str | None = None) -> None:
-        config = _load_config()
         self._system_prompt = system_prompt
-        self._model = model or config["default_model"]
+        self._model = model or os.getenv("OPENAI_MODEL", _DEFAULT_MODEL)
+        self._temperature = float(os.getenv("OPENAI_TEMPERATURE", _DEFAULT_TEMPERATURE))
+        self._max_tokens = int(os.getenv("OPENAI_MAX_TOKENS", _DEFAULT_MAX_TOKENS))
+        self._enable_thinking = _env_bool("OPENAI_ENABLE_THINKING", False)
+        # OPENAI_API_KEY / OPENAI_BASE_URL：SDK 原生命名；未设 BASE_URL 时默认硅基流动
         self._client = OpenAI(
-            api_key=os.getenv(config["api_key_env"], ""),
-            base_url=config["base_url"],
+            base_url=os.getenv("OPENAI_BASE_URL", _DEFAULT_BASE_URL),
         )
 
     def _call(self, user_content: str) -> str:
         resp = self._client.chat.completions.create(
             model=self._model,
-            max_tokens=256,
+            temperature=self._temperature,
+            max_tokens=self._max_tokens,
             messages=[
                 {"role": "system", "content": self._system_prompt},
                 {"role": "user", "content": user_content},
             ],
+            extra_body={"enable_thinking": self._enable_thinking},
         )
         return resp.choices[0].message.content or ""
 

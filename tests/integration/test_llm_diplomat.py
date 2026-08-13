@@ -40,7 +40,7 @@ class _VerboseDiplomat(LLMDiplomat):
         return result
 
 
-@unittest.skipUnless(os.getenv("SILICONFLOW_API_KEY"), "SILICONFLOW_API_KEY not set")
+@unittest.skipUnless(os.getenv("OPENAI_API_KEY"), "OPENAI_API_KEY not set")
 class TestLLMDiplomatIntegration(unittest.TestCase):
     def setUp(self):
         system_prompt = build_diplomat_system_prompt("queen")

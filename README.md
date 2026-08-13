@@ -19,7 +19,7 @@ python -m web
 
 > **AI 外交官**需要 LLM API Key。推荐[硅基流动](https://cloud.siliconflow.cn/i/Mgp8zD08)——注册即有免费额度：
 > ```bash
-> export SILICONFLOW_API_KEY=sk-xxxxxxxxxxxxxxxxxxxxxxxx
+> cp .env.example .env   # 填入 OPENAI_API_KEY（兼容硅基流动等 OpenAI 接口）
 > ```
 
 ## 对战 Vivian
